@@ -1,0 +1,322 @@
+# QCM Generator Pro - Git Ignore File
+
+# ============================================================================
+# Python
+# ============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# ============================================================================
+# AI/ML Specific
+# ============================================================================
+
+# Models directory (contains large model files)
+models/
+*.bin
+*.gguf
+*.ggml
+*.safetensors
+*.model
+*.pth
+*.pt
+*.ckpt
+*.pkl
+*.pickle
+
+# Data directories - keep structure but ignore contents
+data/pdfs/*
+data/vectorstore/*
+data/database/*
+data/exports/*
+data/cache/*
+!data/.gitkeep
+!data/pdfs/.gitkeep
+!data/vectorstore/.gitkeep
+!data/database/.gitkeep
+!data/exports/.gitkeep
+!data/cache/.gitkeep
+
+# ChromaDB specific
+chroma.sqlite3
+chroma.sqlite3-*
+
+# Embedding cache
+.sentence_transformers_cache/
+.transformers_cache/
+
+# HuggingFace cache
+.cache/huggingface/
+transformers_cache/
+
+# spaCy models
+*.spacy
+
+# ============================================================================
+# Development Tools
+# ============================================================================
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ============================================================================
+# Operating System
+# ============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============================================================================
+# Application Specific
+# ============================================================================
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Configuration files with secrets
+.env.local
+.env.production
+.env.development
+config.json
+secrets.json
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Export files (generated content) - but keep test fixtures
+exports/
+*.csv
+*.xlsx
+*.json
+!tests/fixtures/*.csv
+!tests/fixtures/*.json
+
+# Upload directories
+uploads/
+upload/
+
+# Generated documentation
+docs/build/
+docs/_build/
+documentation/
+
+# ============================================================================
+# Testing
+# ============================================================================
+
+# Test artifacts
+.coverage.*
+.pytest_cache/
+test-results.xml
+test-reports/
+
+# Test databases
+test_*.db
+test_*.sqlite3
+
+# ============================================================================
+# Backup Files
+# ============================================================================
+*.bak
+*.backup
+*.old
+
+# ============================================================================
+# Security
+# ============================================================================
+
+# API Keys and secrets
+*.key
+*.pem
+*.crt
+*.cert
+api_keys.txt
+secrets.txt
+
+# ============================================================================
+# Project Documentation (keep essential ones)
+# ============================================================================
+
+# Ignore generated markdown except essential ones
+*.md
+!README.md
+!CLAUDE.md
+!CHANGELOG.md
+!CONTRIBUTING.md

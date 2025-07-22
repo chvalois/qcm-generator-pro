@@ -1,0 +1,152 @@
+# QCM Generator Pro - Pre-commit Configuration
+# Ensures code quality and consistency before commits
+
+repos:
+  # Python Code Formatting
+  - repo: https://github.com/psf/black
+    rev: 23.9.1
+    hooks:
+      - id: black
+        language_version: python3
+        args: [--line-length=88]
+
+  # Python Import Sorting
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        args: [--profile=black, --line-length=88]
+
+  # Python Linting and Auto-fixing
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.0.290
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+
+  # Python Type Checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.5.1
+    hooks:
+      - id: mypy
+        additional_dependencies: [
+          types-requests,
+          types-PyYAML,
+          types-python-dateutil,
+          pydantic,
+        ]
+        args: [--strict, --ignore-missing-imports]
+        exclude: ^(tests/|scripts/|docs/)
+
+  # General File Checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      # File formatting
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+      # File validation
+      - id: check-yaml
+        args: [--unsafe]  # Allow custom YAML tags
+      - id: check-toml
+      - id: check-json
+      - id: check-xml
+
+      # Security checks
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=10000]  # 10MB limit
+      - id: detect-private-key
+
+      # Python specific
+      - id: check-ast
+      - id: debug-statements
+      - id: name-tests-test
+        args: [--pytest-test-first]
+
+      # General checks
+      - id: check-case-conflict
+      - id: check-docstring-first
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+
+  # Security Scanning
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        args: [-c, pyproject.toml]
+        additional_dependencies: [bandit[toml]]
+        exclude: ^tests/
+
+  # Dependency Security Check
+  - repo: https://github.com/lucas-c/pre-commit-hooks-safety
+    rev: v1.3.2
+    hooks:
+      - id: python-safety-dependencies-check
+        args: [--ignore=51668]  # Ignore specific CVE if needed
+
+  # Documentation Checks
+  - repo: https://github.com/pycqa/pydocstyle
+    rev: 6.3.0
+    hooks:
+      - id: pydocstyle
+        args:
+          - --convention=numpy
+          - --add-ignore=D100,D101,D102,D103,D104,D105,D107
+        exclude: ^(tests/|scripts/|migrations/)
+
+  # YAML Formatting
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.0.3
+    hooks:
+      - id: prettier
+        types_or: [yaml]
+        args: [--tab-width=2]
+
+  # Markdown Formatting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.37.0
+    hooks:
+      - id: markdownlint
+        args: [--fix]
+        exclude: ^(CHANGELOG\.md|\.github/)
+
+  # Shell Script Linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.5
+    hooks:
+      - id: shellcheck
+        args: [-e, SC1091]  # Ignore sourcing non-existent files
+
+# Configuration for specific hooks
+ci:
+  autofix_prs: true
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+
+    for more information, see https://pre-commit.ci
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: [mypy, bandit, python-safety-dependencies-check]  # Skip slow hooks in CI
+  submodules: false
+
+# Exclude patterns
+exclude: |
+  (?x)^(
+      \.git/|
+      \.pytest_cache/|
+      \.mypy_cache/|
+      \.venv/|
+      __pycache__/|
+      data/|
+      models/|
+      logs/|
+      \.env.*|
+      migrations/versions/.*\.py
+  )$
