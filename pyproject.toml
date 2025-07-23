@@ -21,75 +21,40 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    # Core Web Framework
+    # Core essentials only
     "fastapi>=0.104.0,<1.0.0",
     "pydantic>=2.5.0,<3.0.0",
-    "uvicorn[standard]>=0.24.0,<1.0.0",
-    
+    "uvicorn>=0.24.0,<1.0.0",
+    "sqlalchemy>=2.0.0,<3.0.0",
+    "python-dotenv>=1.0.0,<2.0.0",
+    "pydantic-settings>=2.1.0,<3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Basic testing and linting only
+    "pytest>=7.4.0,<8.0.0",
+    "ruff>=0.0.290,<1.0.0",
+]
+
+# Extended dependencies for full features (optional)
+full = [
     # LLM & AI Processing
     "langchain>=0.1.0,<1.0.0",
-    "langchain-community>=0.0.20,<1.0.0",
-    "langchain-openai>=0.0.5,<1.0.0",
     "openai>=1.0.0,<2.0.0",
     
     # Vector Database
     "chromadb>=0.4.22,<1.0.0",
     
-    # Embeddings
-    "sentence-transformers>=2.2.0,<3.0.0",
-    
-    # Machine Learning & Data Processing
-    "scikit-learn>=1.3.0,<2.0.0",
-    "numpy>=1.24.0,<2.0.0",
-    "pandas>=2.0.0,<3.0.0",
-    
-    # NLP Processing
-    "spacy>=3.7.0,<4.0.0",
-    
     # PDF Processing
     "pypdf>=3.0.0,<4.0.0",
-    "pdfplumber>=0.10.0,<1.0.0",
-    
-    # Database ORM
-    "sqlalchemy>=2.0.0,<3.0.0",
     
     # Web Interface
     "gradio>=4.0.0,<5.0.0",
     
-    # Utilities
+    # Additional utilities
     "python-multipart>=0.0.6,<1.0.0",
-    "python-dotenv>=1.0.0,<2.0.0",
-    "pydantic-settings>=2.1.0,<3.0.0",
-    
-    # HTTP Client
     "httpx>=0.25.0,<1.0.0",
-    
-    # Data validation helpers
-    "email-validator>=2.0.0,<3.0.0",
-]
-
-[project.optional-dependencies]
-dev = [
-    # Testing
-    "pytest>=7.4.0,<8.0.0",
-    "pytest-asyncio>=0.21.0,<1.0.0",
-    "pytest-mock>=3.11.0,<4.0.0",
-    "pytest-cov>=4.1.0,<5.0.0",
-    "coverage[toml]>=7.3.0,<8.0.0",
-    
-    # Code Quality
-    "black>=23.9.0,<24.0.0",
-    "ruff>=0.0.290,<1.0.0",
-    "mypy>=1.5.0,<2.0.0",
-    "pre-commit>=3.4.0,<4.0.0",
-    
-    # Development Tools
-    "ipython>=8.15.0,<9.0.0",
-    "jupyter>=1.0.0,<2.0.0",
-    
-    # Documentation
-    "mkdocs>=1.5.0,<2.0.0",
-    "mkdocs-material>=9.2.0,<10.0.0",
 ]
 
 [project.urls]
