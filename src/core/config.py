@@ -5,11 +5,10 @@ This module provides centralized configuration management using Pydantic Setting
 with environment variable support and validation.
 """
 
-import os
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import List, Optional
 
-from pydantic import AnyHttpUrl, Field, field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 from ..models.enums import (
@@ -36,8 +35,7 @@ class DatabaseSettings(BaseSettings):
     pool_pre_ping: bool = Field(default=True, description="Enable connection health checks")
     pool_recycle: int = Field(default=300, description="Connection recycle time in seconds")
     
-    class Config:
-        env_prefix = "DATABASE_"
+    model_config = {'env_prefix': 'DATABASE_'}
 
 
 class LLMSettings(BaseSettings):
@@ -72,8 +70,7 @@ class LLMSettings(BaseSettings):
     default_max_tokens: int = Field(default=512, ge=50, le=2000, description="Default max tokens")
     default_top_p: float = Field(default=0.9, ge=0.1, le=1.0, description="Default top_p")
     
-    class Config:
-        env_prefix = "LLM_"
+    model_config = {'env_prefix': 'LLM_'}
 
 
 class VectorStoreSettings(BaseSettings):
@@ -95,8 +92,7 @@ class VectorStoreSettings(BaseSettings):
     default_search_limit: int = Field(default=5, ge=1, le=50, description="Default number of search results")
     similarity_threshold: float = Field(default=0.7, ge=0.0, le=1.0, description="Similarity search threshold")
     
-    class Config:
-        env_prefix = "VECTOR_"
+    model_config = {'env_prefix': 'VECTOR_'}
 
 
 class ProcessingSettings(BaseSettings):
@@ -128,8 +124,7 @@ class ProcessingSettings(BaseSettings):
     # Language detection
     language_detection_threshold: float = Field(default=0.8, ge=0.0, le=1.0, description="Language detection threshold")
     
-    class Config:
-        env_prefix = "PROCESSING_"
+    model_config = {'env_prefix': 'PROCESSING_'}
 
 
 class GenerationSettings(BaseSettings):
@@ -182,8 +177,7 @@ class GenerationSettings(BaseSettings):
             raise ValueError('Difficulty ratios must sum to 1.0')
         return v
     
-    class Config:
-        env_prefix = "GENERATION_"
+    model_config = {'env_prefix': 'GENERATION_'}
 
 
 class UISettings(BaseSettings):
@@ -199,8 +193,7 @@ class UISettings(BaseSettings):
     max_file_size_mb: int = Field(default=50, ge=1, le=500, description="Maximum file size in MB")
     concurrent_sessions: int = Field(default=5, ge=1, le=20, description="Maximum concurrent sessions")
     
-    class Config:
-        env_prefix = "UI_"
+    model_config = {'env_prefix': 'UI_'}
 
 
 class SecuritySettings(BaseSettings):
@@ -223,8 +216,7 @@ class SecuritySettings(BaseSettings):
     rate_limit_enabled: bool = Field(default=True, description="Enable rate limiting")
     rate_limit_per_minute: int = Field(default=60, ge=1, le=1000, description="Rate limit per minute")
     
-    class Config:
-        env_prefix = "SECURITY_"
+    model_config = {'env_prefix': 'SECURITY_'}
 
 
 class CacheSettings(BaseSettings):
@@ -241,8 +233,7 @@ class CacheSettings(BaseSettings):
     file_cache_dir: Path = Field(default=Path("./data/cache"), description="File cache directory")
     file_cache_max_size_mb: int = Field(default=500, ge=10, le=10000, description="Max file cache size in MB")
     
-    class Config:
-        env_prefix = "CACHE_"
+    model_config = {'env_prefix': 'CACHE_'}
 
 
 class LoggingSettings(BaseSettings):
@@ -260,8 +251,7 @@ class LoggingSettings(BaseSettings):
     max_size_mb: int = Field(default=10, ge=1, le=100, description="Max log file size in MB")
     backup_count: int = Field(default=3, ge=1, le=10, description="Number of log file backups")
     
-    class Config:
-        env_prefix = "LOG_"
+    model_config = {'env_prefix': 'LOG_'}
 
 
 class Settings(BaseSettings):
@@ -342,26 +332,12 @@ class Settings(BaseSettings):
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-        validate_assignment = True
-        
-        # Custom environment variable parsing
-        @classmethod
-        def parse_env_var(cls, field_name: str, raw_val: str) -> any:
-            # Handle comma-separated lists
-            if field_name in ['supported_languages', 'cors_origins', 'cors_allow_methods', 'cors_allow_headers', 'spacy_disable_components']:
-                return [item.strip() for item in raw_val.split(',') if item.strip()]
-            # Handle JSON lists for validation_batches
-            if field_name == 'validation_batches':
-                import json
-                try:
-                    return json.loads(raw_val)
-                except json.JSONDecodeError:
-                    return [int(x.strip()) for x in raw_val.split(',') if x.strip()]
-            return raw_val
+    model_config = {
+        'env_file': '.env',
+        'env_file_encoding': 'utf-8',
+        'case_sensitive': False,
+        'validate_assignment': True,
+    }
 
 
 # Global settings instance
