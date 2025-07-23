@@ -285,7 +285,7 @@ OLLAMA_DEFAULT_URL = f"http://{OLLAMA_DEFAULT_HOST}:{OLLAMA_DEFAULT_PORT}"
 # Recommended local models
 RECOMMENDED_LOCAL_MODELS = [
     "mistral:7b-instruct",
-    "llama3:8b-instruct", 
+    "llama3:8b-instruct",
     "phi3:medium",
 ]
 
@@ -307,7 +307,7 @@ MODEL_CONTEXT_LENGTHS = {
 LANGUAGE_NAMES = {
     "fr": "Français",
     "en": "English",
-    "es": "Español", 
+    "es": "Español",
     "de": "Deutsch",
     "it": "Italiano",
     "pt": "Português",
@@ -373,7 +373,7 @@ PROMETHEUS_PORT = 8001
 HEALTH_CHECK_TIMEOUT = 5
 HEALTH_CHECK_ENDPOINTS = [
     "database",
-    "vector_store", 
+    "vector_store",
     "llm_service",
     "file_system",
 ]

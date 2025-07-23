@@ -6,8 +6,9 @@ and database utilities using SQLAlchemy with async support.
 """
 
 import logging
-from contextlib import contextmanager, asynccontextmanager
-from typing import AsyncGenerator, Generator, Optional
+from collections.abc import AsyncGenerator, Generator
+from contextlib import asynccontextmanager, contextmanager
+from typing import Optional
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
@@ -15,31 +16,31 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import QueuePool, StaticPool
 
+from ..models.database import Base
 from .config import settings
 from .exceptions import DatabaseConnectionError, DatabaseError
-from ..models.database import Base
 
 logger = logging.getLogger(__name__)
 
 
 class DatabaseManager:
     """Database connection and session manager."""
-    
-    def __init__(self, database_url: Optional[str] = None):
+
+    def __init__(self, database_url: str | None = None):
         """Initialize database manager with connection URL."""
         self.database_url = database_url or settings.database.url
-        self._engine: Optional[Engine] = None
+        self._engine: Engine | None = None
         self._async_engine = None
-        self._session_maker: Optional[sessionmaker] = None
+        self._session_maker: sessionmaker | None = None
         self._async_session_maker = None
-        
+
     @property
     def engine(self) -> Engine:
         """Get or create synchronous database engine."""
         if self._engine is None:
             self._engine = self._create_engine()
         return self._engine
-    
+
     @property
     def async_engine(self):
         """Get or create asynchronous database engine."""
@@ -52,7 +53,7 @@ class DatabaseManager:
                 pool_pre_ping=True,
             )
         return self._async_engine
-    
+
     @property
     def session_maker(self) -> sessionmaker:
         """Get session maker for synchronous sessions."""
@@ -63,7 +64,7 @@ class DatabaseManager:
                 expire_on_commit=False,
             )
         return self._session_maker
-    
+
     @property
     def async_session_maker(self):
         """Get session maker for asynchronous sessions."""
@@ -74,7 +75,7 @@ class DatabaseManager:
                 expire_on_commit=False,
             )
         return self._async_session_maker
-    
+
     def _create_engine(self) -> Engine:
         """Create database engine with appropriate settings."""
         try:
@@ -100,7 +101,7 @@ class DatabaseManager:
                     cursor.execute("PRAGMA temp_store=memory")
                     cursor.execute("PRAGMA mmap_size=268435456")  # 256MB
                     cursor.close()
-                    
+
             else:
                 # PostgreSQL or other database configuration
                 engine = create_engine(
@@ -114,10 +115,10 @@ class DatabaseManager:
                         "options": "-c timezone=utc"
                     } if "postgresql" in self.database_url else {},
                 )
-            
+
             logger.info(f"Database engine created: {self.database_url}")
             return engine
-            
+
         except Exception as e:
             logger.error(f"Failed to create database engine: {e}")
             raise DatabaseConnectionError(
@@ -125,7 +126,7 @@ class DatabaseManager:
                 details={"database_url": self.database_url, "error": str(e)},
                 cause=e
             )
-    
+
     def create_tables(self) -> None:
         """Create all database tables."""
         try:
@@ -138,7 +139,7 @@ class DatabaseManager:
                 details={"error": str(e)},
                 cause=e
             )
-    
+
     async def create_tables_async(self) -> None:
         """Create all database tables asynchronously."""
         try:
@@ -152,7 +153,7 @@ class DatabaseManager:
                 details={"error": str(e)},
                 cause=e
             )
-    
+
     def drop_tables(self) -> None:
         """Drop all database tables."""
         try:
@@ -165,7 +166,7 @@ class DatabaseManager:
                 details={"error": str(e)},
                 cause=e
             )
-    
+
     async def drop_tables_async(self) -> None:
         """Drop all database tables asynchronously."""
         try:
@@ -179,21 +180,21 @@ class DatabaseManager:
                 details={"error": str(e)},
                 cause=e
             )
-    
+
     def reset_database(self) -> None:
         """Reset database by dropping and recreating all tables."""
         logger.info("Resetting database...")
         self.drop_tables()
         self.create_tables()
         logger.info("Database reset complete")
-    
+
     async def reset_database_async(self) -> None:
         """Reset database asynchronously by dropping and recreating all tables."""
         logger.info("Resetting database (async)...")
         await self.drop_tables_async()
         await self.create_tables_async()
         logger.info("Database reset complete (async)")
-    
+
     def test_connection(self) -> bool:
         """Test database connection."""
         try:
@@ -204,7 +205,7 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Database connection test failed: {e}")
             return False
-    
+
     async def test_connection_async(self) -> bool:
         """Test database connection asynchronously."""
         try:
@@ -215,7 +216,7 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Database connection test failed (async): {e}")
             return False
-    
+
     @contextmanager
     def get_session(self) -> Generator[Session, None, None]:
         """Get a database session with automatic cleanup."""
@@ -233,7 +234,7 @@ class DatabaseManager:
             )
         finally:
             session.close()
-    
+
     @asynccontextmanager
     async def get_async_session(self) -> AsyncGenerator[AsyncSession, None]:
         """Get an async database session with automatic cleanup."""
@@ -249,7 +250,7 @@ class DatabaseManager:
                     details={"error": str(e)},
                     cause=e
                 )
-    
+
     def close(self) -> None:
         """Close database connections."""
         if self._engine:
@@ -258,7 +259,7 @@ class DatabaseManager:
         if self._async_engine:
             # Note: async engine disposal should be done with await in async context
             logger.info("Async database engine should be disposed in async context")
-    
+
     async def close_async(self) -> None:
         """Close database connections asynchronously."""
         if self._async_engine:

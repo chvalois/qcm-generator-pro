@@ -5,32 +5,32 @@ This module defines all custom exceptions used throughout the application
 with proper error codes, messages, and context information.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Union
 
 
 class QCMGeneratorException(Exception):
     """Base exception class for QCM Generator Pro."""
-    
+
     def __init__(
         self,
         message: str,
-        error_code: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
-        cause: Optional[Exception] = None,
+        error_code: str | None = None,
+        details: dict[str, Any] | None = None,
+        cause: Exception | None = None,
     ):
         self.message = message
         self.error_code = error_code or self.__class__.__name__.upper()
         self.details = details or {}
         self.cause = cause
         super().__init__(self.message)
-    
+
     def __str__(self) -> str:
         return f"[{self.error_code}] {self.message}"
-    
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(message='{self.message}', error_code='{self.error_code}')"
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert exception to dictionary for API responses."""
         return {
             "error": self.__class__.__name__,
@@ -51,12 +51,12 @@ class ConfigurationError(QCMGeneratorException):
 
 class ValidationError(QCMGeneratorException):
     """Raised when data validation fails."""
-    
+
     def __init__(
         self,
         message: str,
-        field: Optional[str] = None,
-        value: Optional[Any] = None,
+        field: str | None = None,
+        value: Any | None = None,
         **kwargs
     ):
         self.field = field
@@ -90,7 +90,7 @@ class FileNotFoundError(FileError):
 
 class FileTooLargeError(FileError):
     """Raised when a file exceeds size limits."""
-    
+
     def __init__(self, message: str, file_size: int, max_size: int, **kwargs):
         self.file_size = file_size
         self.max_size = max_size
@@ -106,8 +106,8 @@ class FileTooLargeError(FileError):
 
 class UnsupportedFileTypeError(FileError):
     """Raised when file type is not supported."""
-    
-    def __init__(self, message: str, file_type: str, supported_types: List[str], **kwargs):
+
+    def __init__(self, message: str, file_type: str, supported_types: list[str], **kwargs):
         self.file_type = file_type
         self.supported_types = supported_types
         details = kwargs.get('details', {})
@@ -120,8 +120,8 @@ class UnsupportedFileTypeError(FileError):
 
 class DocumentProcessingError(QCMGeneratorException):
     """Raised when document processing fails."""
-    
-    def __init__(self, message: str, document_id: Optional[int] = None, stage: Optional[str] = None, **kwargs):
+
+    def __init__(self, message: str, document_id: int | None = None, stage: str | None = None, **kwargs):
         self.document_id = document_id
         self.stage = stage
         details = kwargs.get('details', {})
@@ -163,8 +163,8 @@ class DatabaseConnectionError(DatabaseError):
 
 class RecordNotFoundError(DatabaseError):
     """Raised when a database record is not found."""
-    
-    def __init__(self, message: str, model: Optional[str] = None, record_id: Optional[Union[int, str]] = None, **kwargs):
+
+    def __init__(self, message: str, model: str | None = None, record_id: int | str | None = None, **kwargs):
         self.model = model
         self.record_id = record_id
         details = kwargs.get('details', {})
@@ -177,8 +177,8 @@ class RecordNotFoundError(DatabaseError):
 
 class DuplicateRecordError(DatabaseError):
     """Raised when attempting to create a duplicate record."""
-    
-    def __init__(self, message: str, model: Optional[str] = None, conflicting_fields: Optional[Dict[str, Any]] = None, **kwargs):
+
+    def __init__(self, message: str, model: str | None = None, conflicting_fields: dict[str, Any] | None = None, **kwargs):
         self.model = model
         self.conflicting_fields = conflicting_fields or {}
         details = kwargs.get('details', {})
@@ -205,8 +205,8 @@ class LLMError(QCMGeneratorException):
 
 class ModelNotAvailableError(LLMError):
     """Raised when requested LLM model is not available."""
-    
-    def __init__(self, message: str, model_name: str, available_models: Optional[List[str]] = None, **kwargs):
+
+    def __init__(self, message: str, model_name: str, available_models: list[str] | None = None, **kwargs):
         self.model_name = model_name
         self.available_models = available_models or []
         details = kwargs.get('details', {})
@@ -219,8 +219,8 @@ class ModelNotAvailableError(LLMError):
 
 class ModelResponseError(LLMError):
     """Raised when LLM model returns an error or invalid response."""
-    
-    def __init__(self, message: str, model_name: Optional[str] = None, response: Optional[str] = None, **kwargs):
+
+    def __init__(self, message: str, model_name: str | None = None, response: str | None = None, **kwargs):
         self.model_name = model_name
         self.response = response
         details = kwargs.get('details', {})
@@ -233,7 +233,7 @@ class ModelResponseError(LLMError):
 
 class GenerationTimeoutError(LLMError):
     """Raised when question generation times out."""
-    
+
     def __init__(self, message: str, timeout_seconds: int, **kwargs):
         self.timeout_seconds = timeout_seconds
         details = kwargs.get('details', {})
@@ -243,12 +243,12 @@ class GenerationTimeoutError(LLMError):
 
 class GenerationError(QCMGeneratorException):
     """Raised when question generation fails."""
-    
+
     def __init__(
         self,
         message: str,
-        session_id: Optional[str] = None,
-        question_number: Optional[int] = None,
+        session_id: str | None = None,
+        question_number: int | None = None,
         **kwargs
     ):
         self.session_id = session_id
@@ -282,8 +282,8 @@ class VectorStoreError(QCMGeneratorException):
 
 class EmbeddingError(VectorStoreError):
     """Raised when embedding generation fails."""
-    
-    def __init__(self, message: str, text_sample: Optional[str] = None, model_name: Optional[str] = None, **kwargs):
+
+    def __init__(self, message: str, text_sample: str | None = None, model_name: str | None = None, **kwargs):
         self.text_sample = text_sample
         self.model_name = model_name
         details = kwargs.get('details', {})
@@ -310,12 +310,12 @@ class CollectionNotFoundError(VectorStoreError):
 
 class QuestionValidationError(QCMGeneratorException):
     """Base exception for question validation errors."""
-    
+
     def __init__(
         self,
         message: str,
-        question_id: Optional[int] = None,
-        validation_issues: Optional[List[str]] = None,
+        question_id: int | None = None,
+        validation_issues: list[str] | None = None,
         **kwargs
     ):
         self.question_id = question_id
@@ -340,7 +340,7 @@ class InvalidOptionsError(QuestionValidationError):
 
 class QualityThresholdError(QuestionValidationError):
     """Raised when question doesn't meet quality thresholds."""
-    
+
     def __init__(
         self,
         message: str,
@@ -369,8 +369,8 @@ class ExportError(QCMGeneratorException):
 
 class UnsupportedExportFormatError(ExportError):
     """Raised when export format is not supported."""
-    
-    def __init__(self, message: str, format_name: str, supported_formats: List[str], **kwargs):
+
+    def __init__(self, message: str, format_name: str, supported_formats: list[str], **kwargs):
         self.format_name = format_name
         self.supported_formats = supported_formats
         details = kwargs.get('details', {})
@@ -397,12 +397,12 @@ class NoQuestionsToExportError(ExportError):
 
 class APIError(QCMGeneratorException):
     """Base exception for API-related errors."""
-    
+
     def __init__(
         self,
         message: str,
-        status_code: Optional[int] = None,
-        endpoint: Optional[str] = None,
+        status_code: int | None = None,
+        endpoint: str | None = None,
         **kwargs
     ):
         self.status_code = status_code
@@ -427,13 +427,13 @@ class AuthorizationError(APIError):
 
 class RateLimitError(APIError):
     """Raised when rate limit is exceeded."""
-    
+
     def __init__(
         self,
         message: str,
         limit: int,
         window_seconds: int,
-        retry_after: Optional[int] = None,
+        retry_after: int | None = None,
         **kwargs
     ):
         self.limit = limit
@@ -456,7 +456,7 @@ class NetworkError(QCMGeneratorException):
 
 class TimeoutError(QCMGeneratorException):
     """Raised when operations timeout."""
-    
+
     def __init__(self, message: str, operation: str, timeout_seconds: int, **kwargs):
         self.operation = operation
         self.timeout_seconds = timeout_seconds
@@ -479,13 +479,13 @@ class ResourceError(QCMGeneratorException):
 
 class InsufficientResourcesError(ResourceError):
     """Raised when system resources are insufficient."""
-    
+
     def __init__(
         self,
         message: str,
         resource_type: str,
-        required: Union[int, float],
-        available: Union[int, float],
+        required: int | float,
+        available: int | float,
         **kwargs
     ):
         self.resource_type = resource_type
@@ -512,7 +512,7 @@ class DiskSpaceError(ResourceError):
 
 class ConcurrencyLimitError(ResourceError):
     """Raised when concurrency limits are exceeded."""
-    
+
     def __init__(self, message: str, current: int, limit: int, **kwargs):
         self.current = current
         self.limit = limit
@@ -535,7 +535,7 @@ class SessionError(QCMGeneratorException):
 
 class SessionNotFoundError(SessionError):
     """Raised when generation session is not found."""
-    
+
     def __init__(self, message: str, session_id: str, **kwargs):
         self.session_id = session_id
         details = kwargs.get('details', {})
@@ -545,13 +545,13 @@ class SessionNotFoundError(SessionError):
 
 class SessionStateError(SessionError):
     """Raised when session is in invalid state for operation."""
-    
+
     def __init__(
         self,
         message: str,
         session_id: str,
         current_state: str,
-        required_state: Optional[str] = None,
+        required_state: str | None = None,
         **kwargs
     ):
         self.session_id = session_id
@@ -590,7 +590,7 @@ class CacheKeyError(CacheError):
 # Exception Utilities
 # ============================================================================
 
-def format_validation_error(errors: List[Dict[str, Any]]) -> str:
+def format_validation_error(errors: list[dict[str, Any]]) -> str:
     """Format Pydantic validation errors into a readable string."""
     error_messages = []
     for error in errors:
@@ -603,7 +603,7 @@ def format_validation_error(errors: List[Dict[str, Any]]) -> str:
 def create_api_error_response(
     exception: QCMGeneratorException,
     status_code: int = 500
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a standardized API error response from an exception."""
     return {
         "error": {

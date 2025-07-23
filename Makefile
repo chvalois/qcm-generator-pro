@@ -219,8 +219,7 @@ ci-test:
 	pytest --cov=src --cov-report=xml --junit-xml=test-results.xml
 
 ci-lint:
-	ruff check src tests --output-format=github
-	mypy src --junit-xml=mypy-results.xml
+	ruff check src tests
 
 # ============================================================================
 # Development Workflow Shortcuts

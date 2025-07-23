@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuite errors="0" failures="1" name="mypy" skips="0" tests="1" time="30.952">
+  <testcase classname="mypy" file="mypy" line="1" name="mypy-py3_11-linux" time="30.952">
+    <failure message="mypy produced messages">src/core/exceptions.py:55: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:94: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:110: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:124: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:167: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:181: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:209: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:223: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:237: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:247: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:286: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:314: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:344: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:373: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:401: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:431: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:460: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:483: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:516: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:539: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/core/exceptions.py:549: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/models/database.py:31: error: Variable "src.models.database.Base" is not valid as a type  [valid-type]
+src/models/database.py:31: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#variables-vs-type-aliases
+src/models/database.py:31: error: Invalid base class "Base"  [misc]
+src/models/database.py:66: error: Missing type parameters for generic type "dict"  [type-arg]
+src/models/database.py:92: error: Variable "src.models.database.Base" is not valid as a type  [valid-type]
+src/models/database.py:92: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#variables-vs-type-aliases
+src/models/database.py:92: error: Invalid base class "Base"  [misc]
+src/models/database.py:123: error: Missing type parameters for generic type "list"  [type-arg]
+src/models/database.py:124: error: Missing type parameters for generic type "list"  [type-arg]
+src/models/database.py:142: error: Variable "src.models.database.Base" is not valid as a type  [valid-type]
+src/models/database.py:142: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#variables-vs-type-aliases
+src/models/database.py:142: error: Invalid base class "Base"  [misc]
+src/models/database.py:177: error: Missing type parameters for generic type "dict"  [type-arg]
+src/models/database.py:192: error: Variable "src.models.database.Base" is not valid as a type  [valid-type]
+src/models/database.py:192: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#variables-vs-type-aliases
+src/models/database.py:192: error: Invalid base class "Base"  [misc]
+src/models/database.py:224: error: Missing type parameters for generic type "list"  [type-arg]
+src/models/database.py:225: error: Missing type parameters for generic type "list"  [type-arg]
+src/models/database.py:229: error: Missing type parameters for generic type "list"  [type-arg]
+src/models/database.py:232: error: Missing type parameters for generic type "dict"  [type-arg]
+src/models/database.py:240: error: Missing type parameters for generic type "list"  [type-arg]
+src/models/database.py:249: error: Missing type parameters for generic type "list"  [type-arg]
+src/models/database.py:253: error: Missing type parameters for generic type "dict"  [type-arg]
+src/models/database.py:254: error: Missing type parameters for generic type "list"  [type-arg]
+src/models/database.py:271: error: Variable "src.models.database.Base" is not valid as a type  [valid-type]
+src/models/database.py:271: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#variables-vs-type-aliases
+src/models/database.py:271: error: Invalid base class "Base"  [misc]
+src/models/database.py:294: error: Missing type parameters for generic type "dict"  [type-arg]
+src/models/database.py:298: error: Missing type parameters for generic type "list"  [type-arg]
+src/models/database.py:327: error: Function is missing a return type annotation  [no-untyped-def]
+src/models/database.py:327: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+src/models/database.py:332: error: Function is missing a type annotation  [no-untyped-def]
+src/models/database.py:337: error: Function is missing a type annotation  [no-untyped-def]
+src/models/database.py:342: error: Function is missing a type annotation  [no-untyped-def]
+src/models/database.py:348: error: Function is missing a return type annotation  [no-untyped-def]
+src/models/schemas.py:76: error: Missing type parameters for generic type "dict"  [type-arg]
+src/models/schemas.py:88: error: Missing type parameters for generic type "dict"  [type-arg]
+src/models/schemas.py:103: error: Missing type parameters for generic type "dict"  [type-arg]
+src/models/schemas.py:142: error: Function is missing a type annotation  [no-untyped-def]
+src/models/schemas.py:192: error: No overload variant of "Field" matches argument types "EllipsisType", "int", "int"  [call-overload]
+src/models/schemas.py:192: note: Possible overload variants:
+src/models/schemas.py:192: note:     def Field(default, default: EllipsisType, *, alias: str | None = ..., alias_priority: int | None = ..., validation_alias: str | AliasPath | AliasChoices | None = ..., serialization_alias: str | None = ..., title: str | None = ..., field_title_generator: Callable[[str, FieldInfo], str] | None = ..., description: str | None = ..., examples: list[Any] | None = ..., exclude: bool | None = ..., discriminator: str | Discriminator | None = ..., deprecated: deprecated | str | bool | None = ..., json_schema_extra: JsonDict | Callable[[JsonDict], None] | None = ..., frozen: bool | None = ..., validate_default: bool | None = ..., repr: bool = ..., init: bool | None = ..., init_var: bool | None = ..., kw_only: bool | None = ..., pattern: str | Pattern[str] | None = ..., strict: bool | None = ..., coerce_numbers_to_str: bool | None = ..., gt: SupportsGt | None = ..., ge: SupportsGe | None = ..., lt: SupportsLt | None = ..., le: SupportsLe | None = ..., multiple_of: float | None = ..., allow_inf_nan: bool | None = ..., max_digits: int | None = ..., decimal_places: int | None = ..., min_length: int | None = ..., max_length: int | None = ..., union_mode: Literal['smart', 'left_to_right'] = ..., fail_fast: bool | None = ...) -&gt; Any
+src/models/schemas.py:192: note:     def [_T] Field(default, default: _T, *, alias: str | None = ..., alias_priority: int | None = ..., validation_alias: str | AliasPath | AliasChoices | None = ..., serialization_alias: str | None = ..., title: str | None = ..., field_title_generator: Callable[[str, FieldInfo], str] | None = ..., description: str | None = ..., examples: list[Any] | None = ..., exclude: bool | None = ..., discriminator: str | Discriminator | None = ..., deprecated: deprecated | str | bool | None = ..., json_schema_extra: JsonDict | Callable[[JsonDict], None] | None = ..., frozen: bool | None = ..., validate_default: bool | None = ..., repr: bool = ..., init: bool | None = ..., init_var: bool | None = ..., kw_only: bool | None = ..., pattern: str | Pattern[str] | None = ..., strict: bool | None = ..., coerce_numbers_to_str: bool | None = ..., gt: SupportsGt | None = ..., ge: SupportsGe | None = ..., lt: SupportsLt | None = ..., le: SupportsLe | None = ..., multiple_of: float | None = ..., allow_inf_nan: bool | None = ..., max_digits: int | None = ..., decimal_places: int | None = ..., min_length: int | None = ..., max_length: int | None = ..., union_mode: Literal['smart', 'left_to_right'] = ..., fail_fast: bool | None = ...) -&gt; _T
+src/models/schemas.py:192: note:     def [_T] Field(default_factory, *, default_factory: Callable[[], _T] | Callable[[dict[str, Any]], _T], alias: str | None = ..., alias_priority: int | None = ..., validation_alias: str | AliasPath | AliasChoices | None = ..., serialization_alias: str | None = ..., title: str | None = ..., field_title_generator: Callable[[str, FieldInfo], str] | None = ..., description: str | None = ..., examples: list[Any] | None = ..., exclude: bool | None = ..., discriminator: str | Discriminator | None = ..., deprecated: deprecated | str | bool | None = ..., json_schema_extra: JsonDict | Callable[[JsonDict], None] | None = ..., frozen: bool | None = ..., validate_default: bool | None = ..., repr: bool = ..., init: bool | None = ..., init_var: bool | None = ..., kw_only: bool | None = ..., pattern: str | Pattern[str] | None = ..., strict: bool | None = ..., coerce_numbers_to_str: bool | None = ..., gt: SupportsGt | None = ..., ge: SupportsGe | None = ..., lt: SupportsLt | None = ..., le: SupportsLe | None = ..., multiple_of: float | None = ..., allow_inf_nan: bool | None = ..., max_digits: int | None = ..., decimal_places: int | None = ..., min_length: int | None = ..., max_length: int | None = ..., union_mode: Literal['smart', 'left_to_right'] = ..., fail_fast: bool | None = ...) -&gt; _T
+src/models/schemas.py:192: note:     def Field(alias, *, alias: str | None = ..., alias_priority: int | None = ..., validation_alias: str | AliasPath | AliasChoices | None = ..., serialization_alias: str | None = ..., title: str | None = ..., field_title_generator: Callable[[str, FieldInfo], str] | None = ..., description: str | None = ..., examples: list[Any] | None = ..., exclude: bool | None = ..., discriminator: str | Discriminator | None = ..., deprecated: deprecated | str | bool | None = ..., json_schema_extra: JsonDict | Callable[[JsonDict], None] | None = ..., frozen: bool | None = ..., validate_default: bool | None = ..., repr: bool = ..., init: bool | None = ..., init_var: bool | None = ..., kw_only: bool | None = ..., pattern: str | Pattern[str] | None = ..., strict: bool | None = ..., coerce_numbers_to_str: bool | None = ..., gt: SupportsGt | None = ..., ge: SupportsGe | None = ..., lt: SupportsLt | None = ..., le: SupportsLe | None = ..., multiple_of: float | None = ..., allow_inf_nan: bool | None = ..., max_digits: int | None = ..., decimal_places: int | None = ..., min_length: int | None = ..., max_length: int | None = ..., union_mode: Literal['smart', 'left_to_right'] = ..., fail_fast: bool | None = ...) -&gt; Any
+src/models/schemas.py:199: error: Function is missing a type annotation  [no-untyped-def]
+src/models/schemas.py:228: error: Missing type parameters for generic type "dict"  [type-arg]
+src/models/schemas.py:235: error: No overload variant of "Field" matches argument types "None", "int", "int"  [call-overload]
+src/models/schemas.py:235: note: Possible overload variants:
+src/models/schemas.py:235: note:     def Field(default, default: EllipsisType, *, alias: str | None = ..., alias_priority: int | None = ..., validation_alias: str | AliasPath | AliasChoices | None = ..., serialization_alias: str | None = ..., title: str | None = ..., field_title_generator: Callable[[str, FieldInfo], str] | None = ..., description: str | None = ..., examples: list[Any] | None = ..., exclude: bool | None = ..., discriminator: str | Discriminator | None = ..., deprecated: deprecated | str | bool | None = ..., json_schema_extra: JsonDict | Callable[[JsonDict], None] | None = ..., frozen: bool | None = ..., validate_default: bool | None = ..., repr: bool = ..., init: bool | None = ..., init_var: bool | None = ..., kw_only: bool | None = ..., pattern: str | Pattern[str] | None = ..., strict: bool | None = ..., coerce_numbers_to_str: bool | None = ..., gt: SupportsGt | None = ..., ge: SupportsGe | None = ..., lt: SupportsLt | None = ..., le: SupportsLe | None = ..., multiple_of: float | None = ..., allow_inf_nan: bool | None = ..., max_digits: int | None = ..., decimal_places: int | None = ..., min_length: int | None = ..., max_length: int | None = ..., union_mode: Literal['smart', 'left_to_right'] = ..., fail_fast: bool | None = ...) -&gt; Any
+src/models/schemas.py:235: note:     def [_T] Field(default, default: _T, *, alias: str | None = ..., alias_priority: int | None = ..., validation_alias: str | AliasPath | AliasChoices | None = ..., serialization_alias: str | None = ..., title: str | None = ..., field_title_generator: Callable[[str, FieldInfo], str] | None = ..., description: str | None = ..., examples: list[Any] | None = ..., exclude: bool | None = ..., discriminator: str | Discriminator | None = ..., deprecated: deprecated | str | bool | None = ..., json_schema_extra: JsonDict | Callable[[JsonDict], None] | None = ..., frozen: bool | None = ..., validate_default: bool | None = ..., repr: bool = ..., init: bool | None = ..., init_var: bool | None = ..., kw_only: bool | None = ..., pattern: str | Pattern[str] | None = ..., strict: bool | None = ..., coerce_numbers_to_str: bool | None = ..., gt: SupportsGt | None = ..., ge: SupportsGe | None = ..., lt: SupportsLt | None = ..., le: SupportsLe | None = ..., multiple_of: float | None = ..., allow_inf_nan: bool | None = ..., max_digits: int | None = ..., decimal_places: int | None = ..., min_length: int | None = ..., max_length: int | None = ..., union_mode: Literal['smart', 'left_to_right'] = ..., fail_fast: bool | None = ...) -&gt; _T
+src/models/schemas.py:235: note:     def [_T] Field(default_factory, *, default_factory: Callable[[], _T] | Callable[[dict[str, Any]], _T], alias: str | None = ..., alias_priority: int | None = ..., validation_alias: str | AliasPath | AliasChoices | None = ..., serialization_alias: str | None = ..., title: str | None = ..., field_title_generator: Callable[[str, FieldInfo], str] | None = ..., description: str | None = ..., examples: list[Any] | None = ..., exclude: bool | None = ..., discriminator: str | Discriminator | None = ..., deprecated: deprecated | str | bool | None = ..., json_schema_extra: JsonDict | Callable[[JsonDict], None] | None = ..., frozen: bool | None = ..., validate_default: bool | None = ..., repr: bool = ..., init: bool | None = ..., init_var: bool | None = ..., kw_only: bool | None = ..., pattern: str | Pattern[str] | None = ..., strict: bool | None = ..., coerce_numbers_to_str: bool | None = ..., gt: SupportsGt | None = ..., ge: SupportsGe | None = ..., lt: SupportsLt | None = ..., le: SupportsLe | None = ..., multiple_of: float | None = ..., allow_inf_nan: bool | None = ..., max_digits: int | None = ..., decimal_places: int | None = ..., min_length: int | None = ..., max_length: int | None = ..., union_mode: Literal['smart', 'left_to_right'] = ..., fail_fast: bool | None = ...) -&gt; _T
+src/models/schemas.py:235: note:     def Field(alias, *, alias: str | None = ..., alias_priority: int | None = ..., validation_alias: str | AliasPath | AliasChoices | None = ..., serialization_alias: str | None = ..., title: str | None = ..., field_title_generator: Callable[[str, FieldInfo], str] | None = ..., description: str | None = ..., examples: list[Any] | None = ..., exclude: bool | None = ..., discriminator: str | Discriminator | None = ..., deprecated: deprecated | str | bool | None = ..., json_schema_extra: JsonDict | Callable[[JsonDict], None] | None = ..., frozen: bool | None = ..., validate_default: bool | None = ..., repr: bool = ..., init: bool | None = ..., init_var: bool | None = ..., kw_only: bool | None = ..., pattern: str | Pattern[str] | None = ..., strict: bool | None = ..., coerce_numbers_to_str: bool | None = ..., gt: SupportsGt | None = ..., ge: SupportsGe | None = ..., lt: SupportsLt | None = ..., le: SupportsLe | None = ..., multiple_of: float | None = ..., allow_inf_nan: bool | None = ..., max_digits: int | None = ..., decimal_places: int | None = ..., min_length: int | None = ..., max_length: int | None = ..., union_mode: Literal['smart', 'left_to_right'] = ..., fail_fast: bool | None = ...) -&gt; Any
+src/models/schemas.py:273: error: Missing type parameters for generic type "dict"  [type-arg]
+src/models/schemas.py:274: error: Missing type parameters for generic type "dict"  [type-arg]
+src/models/schemas.py:328: error: Function is missing a type annotation  [no-untyped-def]
+src/models/schemas.py:336: error: Function is missing a type annotation  [no-untyped-def]
+src/models/schemas.py:344: error: Function is missing a type annotation  [no-untyped-def]
+src/models/schemas.py:370: error: Missing type parameters for generic type "dict"  [type-arg]
+src/models/schemas.py:413: error: Function is missing a type annotation  [no-untyped-def]
+src/models/schemas.py:465: error: Function is missing a type annotation  [no-untyped-def]
+src/models/schemas.py:498: error: Missing type parameters for generic type "dict"  [type-arg]
+src/core/config.py:160: error: Function is missing a type annotation  [no-untyped-def]
+src/core/config.py:170: error: Function is missing a type annotation  [no-untyped-def]
+src/core/database.py:34: error: Missing type parameters for generic type "sessionmaker"  [type-arg]
+src/core/database.py:45: error: Function is missing a return type annotation  [no-untyped-def]
+src/core/database.py:50: error: Incompatible types in assignment (expression has type "AsyncEngine", variable has type "None")  [assignment]
+src/core/database.py:58: error: Missing type parameters for generic type "sessionmaker"  [type-arg]
+src/core/database.py:69: error: Function is missing a return type annotation  [no-untyped-def]
+src/core/database.py:72: error: Incompatible types in assignment (expression has type "async_sessionmaker[AsyncSession]", variable has type "None")  [assignment]
+src/core/database.py:96: error: Function is missing a type annotation  [no-untyped-def]
+src/core/database.py:202: error: No overload variant of "execute" of "Connection" matches argument type "str"  [call-overload]
+src/core/database.py:202: note: Possible overload variants:
+src/core/database.py:202: note:     def [_T: Any] execute(self, statement: TypedReturnsRows[_T], parameters: Sequence[Mapping[str, Any]] | Mapping[str, Any] | None = ..., *, execution_options: _CoreKnownExecutionOptions | Mapping[str, Any] | None = ...) -&gt; CursorResult[_T]
+src/core/database.py:202: note:     def execute(self, statement: Executable, parameters: Sequence[Mapping[str, Any]] | Mapping[str, Any] | None = ..., *, execution_options: _CoreKnownExecutionOptions | Mapping[str, Any] | None = ...) -&gt; CursorResult[Any]
+src/core/database.py:261: error: Statement is unreachable  [unreachable]
+src/core/database.py:266: error: Statement is unreachable  [unreachable]
+src/core/database.py:316: error: Missing type parameters for generic type "dict"  [type-arg]
+src/core/database.py:333: error: Missing type parameters for generic type "dict"  [type-arg]</failure>
+  </testcase>
+</testsuite>

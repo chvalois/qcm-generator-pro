@@ -7,8 +7,8 @@ for the test suite.
 
 import os
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import pytest
 from sqlalchemy import create_engine
@@ -17,7 +17,7 @@ from sqlalchemy.orm import sessionmaker
 from src.core.config import Settings
 from src.core.database import DatabaseManager
 from src.models.database import Base
-from src.models.enums import Language, QuestionType, Difficulty, ValidationStatus
+from src.models.enums import Difficulty, Language, QuestionType, ValidationStatus
 
 
 @pytest.fixture(scope="session")
@@ -26,17 +26,17 @@ def test_settings() -> Settings:
     # Create temporary directory for test data
     temp_dir = tempfile.mkdtemp()
     test_db_path = Path(temp_dir) / "test_qcm_generator.db"
-    
+
     # Override settings for testing
     os.environ["DATABASE_URL"] = f"sqlite:///{test_db_path}"
     os.environ["ENVIRONMENT"] = "testing"
     os.environ["DEBUG"] = "true"
     os.environ["LOG_LEVEL"] = "DEBUG"
-    
+
     # Create settings instance
     settings = Settings()
     settings.database.url = f"sqlite:///{test_db_path}"
-    
+
     return settings
 
 
@@ -57,9 +57,9 @@ def setup_test_database(test_db_manager: DatabaseManager):
     """Set up test database with tables."""
     # Create all tables
     test_db_manager.create_tables()
-    
+
     yield
-    
+
     # Clean up after all tests
     test_db_manager.close()
 
@@ -81,9 +81,9 @@ def clean_db(test_db_manager: DatabaseManager):
         for table in reversed(Base.metadata.sorted_tables):
             session.execute(table.delete())
         session.commit()
-    
+
     yield
-    
+
     # Clean up after test
     with test_db_manager.get_session() as session:
         for table in reversed(Base.metadata.sorted_tables):
@@ -188,22 +188,22 @@ def mock_pdf_content():
     """Mock PDF content for testing."""
     return """
     Chapter 1: Introduction to Programming
-    
+
     Programming is the process of creating instructions for computers to follow.
     Python is a popular programming language known for its simplicity and readability.
-    
+
     Basic Concepts:
     1. Variables - store data values
     2. Functions - reusable code blocks
     3. Loops - repeat code execution
     4. Conditionals - make decisions in code
-    
+
     Example:
     def greet(name):
         return f"Hello, {name}!"
-    
+
     Chapter 2: Data Types
-    
+
     Python supports several built-in data types:
     - Integers (int)
     - Floating-point numbers (float)
@@ -277,7 +277,7 @@ def mock_document_chunks():
 def create_test_document(session, **kwargs):
     """Create a test document in the database."""
     from src.models.database import Document
-    
+
     document_data = {
         "filename": "test.pdf",
         "file_path": "/tmp/test.pdf",
@@ -285,7 +285,7 @@ def create_test_document(session, **kwargs):
         "processing_status": "completed",
     }
     document_data.update(kwargs)
-    
+
     document = Document(**document_data)
     session.add(document)
     session.commit()
@@ -296,14 +296,14 @@ def create_test_document(session, **kwargs):
 def create_test_theme(session, document_id, **kwargs):
     """Create a test theme in the database."""
     from src.models.database import DocumentTheme
-    
+
     theme_data = {
         "document_id": document_id,
         "theme_name": "Test Theme",
         "confidence_score": 0.8,
     }
     theme_data.update(kwargs)
-    
+
     theme = DocumentTheme(**theme_data)
     session.add(theme)
     session.commit()
@@ -314,7 +314,7 @@ def create_test_theme(session, document_id, **kwargs):
 def create_test_question(session, document_id, **kwargs):
     """Create a test question in the database."""
     from src.models.database import Question
-    
+
     question_data = {
         "document_id": document_id,
         "session_id": "test_session",
@@ -328,7 +328,7 @@ def create_test_question(session, document_id, **kwargs):
         "validation_status": "pending",
     }
     question_data.update(kwargs)
-    
+
     question = Question(**question_data)
     session.add(question)
     session.commit()
@@ -364,9 +364,9 @@ requires_external = pytest.mark.requires_external
 def reset_environment():
     """Reset environment variables after each test."""
     original_env = os.environ.copy()
-    
+
     yield
-    
+
     # Restore original environment
     os.environ.clear()
     os.environ.update(original_env)
@@ -379,17 +379,18 @@ def reset_environment():
 @pytest.fixture
 def memory_profiler():
     """Simple memory usage profiler for tests."""
-    import psutil
     import os
-    
+
+    import psutil
+
     process = psutil.Process(os.getpid())
     start_memory = process.memory_info().rss
-    
+
     yield
-    
+
     end_memory = process.memory_info().rss
     memory_diff = end_memory - start_memory
-    
+
     # Warn if memory usage increased significantly (>10MB)
     if memory_diff > 10 * 1024 * 1024:
         print(f"Warning: Test increased memory usage by {memory_diff / 1024 / 1024:.2f} MB")
@@ -403,7 +404,7 @@ def memory_profiler():
 def temp_pdf_file():
     """Create a temporary PDF file for testing."""
     import tempfile
-    
+
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
         # Write minimal PDF content
         pdf_content = b"""%PDF-1.4
@@ -442,11 +443,11 @@ endstream
 endobj
 xref
 0 5
-0000000000 65535 f 
-0000000010 00000 n 
-0000000053 00000 n 
-0000000125 00000 n 
-0000000185 00000 n 
+0000000000 65535 f
+0000000010 00000 n
+0000000053 00000 n
+0000000125 00000 n
+0000000185 00000 n
 trailer
 <<
 /Size 5
@@ -457,9 +458,9 @@ startxref
 %%EOF"""
         f.write(pdf_content)
         temp_path = f.name
-    
+
     yield temp_path
-    
+
     # Clean up
     if os.path.exists(temp_path):
         os.unlink(temp_path)
