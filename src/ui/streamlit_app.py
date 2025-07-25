@@ -46,6 +46,40 @@ class StreamlitQCMInterface:
         if "processed_documents" not in st.session_state:
             st.session_state.processed_documents = {}
     
+    def _get_unique_filename(self, directory: Path, original_filename: str) -> Path:
+        """
+        Generate a unique filename to avoid conflicts while preserving original name.
+        
+        Args:
+            directory: Target directory path
+            original_filename: Original filename from upload
+            
+        Returns:
+            Path to unique filename
+        """
+        # Clean filename to be filesystem-safe
+        safe_filename = "".join(c for c in original_filename if c.isalnum() or c in "._- ").strip()
+        if not safe_filename.lower().endswith('.pdf'):
+            safe_filename += '.pdf'
+        
+        base_path = directory / safe_filename
+        
+        # If file doesn't exist, use original name
+        if not base_path.exists():
+            return base_path
+        
+        # If file exists, add numeric suffix
+        filename_stem = base_path.stem
+        filename_suffix = base_path.suffix
+        counter = 1
+        
+        while True:
+            new_filename = f"{filename_stem}_{counter}{filename_suffix}"
+            new_path = directory / new_filename
+            if not new_path.exists():
+                return new_path
+            counter += 1
+    
     def upload_and_process_document(self, file) -> Tuple[str, str, str]:
         """Upload and process a PDF document."""
         try:
@@ -59,10 +93,17 @@ class StreamlitQCMInterface:
             status_text.text("Validation du fichier...")
             progress_bar.progress(0.1)
             
-            # Create temporary file
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
-                tmp_file.write(file.getvalue())
-                file_path = Path(tmp_file.name)
+            # Create permanent file with original name
+            upload_dir = settings.data_dir / "pdfs"
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate unique filename preserving original name
+            original_filename = file.name
+            file_path = self._get_unique_filename(upload_dir, original_filename)
+            
+            # Write file content
+            with open(file_path, 'wb') as f:
+                f.write(file.getvalue())
             
             # Validate PDF content
             try:
@@ -105,11 +146,7 @@ class StreamlitQCMInterface:
                 progress_bar.progress(1.0)
                 status_text.text("✅ Traitement terminé!")
                 
-                # Clean up
-                try:
-                    file_path.unlink()
-                except:
-                    pass
+                # File is now permanently stored in data/pdfs/ directory
                 
                 return (
                     f"✅ Document traité avec succès! ID: {document.id}",
