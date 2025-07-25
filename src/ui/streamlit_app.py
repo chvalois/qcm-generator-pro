@@ -535,7 +535,7 @@ class StreamlitQCMInterface:
             timestamp = __import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S")
             
             if export_format == "CSV (Udemy)":
-                # Export as Udemy CSV
+                # Export as Udemy CSV v2 format
                 filename = f"qcm_export_{timestamp}.csv"
                 export_path = export_dir / filename
                 
@@ -543,29 +543,55 @@ class StreamlitQCMInterface:
                 with open(export_path, 'w', newline='', encoding='utf-8') as f:
                     writer = csv.writer(f)
                     writer.writerow([
-                        "question", "answer_1", "answer_2", "answer_3", "answer_4",
-                        "correct_answer", "explanation"
+                        "Question", "Question Type",
+                        "Answer Option 1", "Explanation 1",
+                        "Answer Option 2", "Explanation 2", 
+                        "Answer Option 3", "Explanation 3",
+                        "Answer Option 4", "Explanation 4",
+                        "Answer Option 5", "Explanation 5",
+                        "Answer Option 6", "Explanation 6",
+                        "Correct Answers", "Overall Explanation", "Domain"
                     ])
                     
                     for question in st.session_state.generated_questions:
-                        # Extract option texts and find correct answer
+                        # Extract option texts and find correct answers
                         option_texts = [opt.text if hasattr(opt, 'text') else str(opt) for opt in question.options]
-                        # Find first correct answer index (1-based for CSV)
-                        correct_answer_index = 1  # Default to first option
+                        
+                        # Find all correct answer indices (1-based for CSV)
+                        correct_answers = []
                         for i, opt in enumerate(question.options):
                             if hasattr(opt, 'is_correct') and opt.is_correct:
-                                correct_answer_index = i + 1
-                                break
+                                correct_answers.append(str(i + 1))
                         
-                        # Pad options to 4 items for Udemy format
-                        padded_options = option_texts + [""] * (4 - len(option_texts))
+                        if not correct_answers:
+                            correct_answers = ["1"]  # Default to first option
                         
-                        writer.writerow([
+                        # Determine question type
+                        question_type = "multiple-choice"
+                        if len(correct_answers) > 1:
+                            question_type = "multi-select"
+                        
+                        # Prepare row data (pad options to 6 items for Udemy v2 format)
+                        row_data = [
                             question.question_text,
-                            padded_options[0], padded_options[1], padded_options[2], padded_options[3],
-                            str(correct_answer_index),
-                            question.explanation
+                            question_type
+                        ]
+                        
+                        # Add up to 6 options with empty explanations
+                        for i in range(6):
+                            if i < len(option_texts):
+                                row_data.extend([option_texts[i], ""])  # Option text, explanation (empty)
+                            else:
+                                row_data.extend(["", ""])  # Empty option and explanation
+                        
+                        # Add correct answers, overall explanation, and domain
+                        row_data.extend([
+                            ",".join(correct_answers),
+                            question.explanation or "",
+                            getattr(question, 'theme', '') or "General"
                         ])
+                        
+                        writer.writerow(row_data)
                         
             else:  # JSON
                 filename = f"qcm_export_{timestamp}.json"

@@ -31,46 +31,54 @@ class ExportService:
     @staticmethod
     def format_question_for_udemy(question: QuestionModel) -> Dict[str, Any]:
         """
-        Format a question for Udemy CSV export.
+        Format a question for Udemy CSV export (v2 format).
         
         Args:
             question: Question model to format
             
         Returns:
-            Formatted question data
+            Formatted question data for Udemy v2 template
         """
-        # Udemy requires specific format: question,answer_1,answer_2,answer_3,answer_4,correct_answer,explanation
+        # Udemy v2 format with up to 6 options and individual explanations
         formatted = {
-            "question": question.question_text,
-            "explanation": question.explanation or ""
+            "Question": question.question_text,
+            "Question Type": "multiple-choice" if question.question_type.value == "multiple-choice" else "multi-select",
+            "Overall Explanation": question.explanation or "",
+            "Domain": question.theme or "General"
         }
         
-        # Add options (pad to 4 options if needed)
+        # Add options and explanations (up to 6 options)
         options = question.options or []
-        for i in range(4):  # Udemy expects exactly 4 options
+        for i in range(6):  # Udemy v2 supports up to 6 options
+            option_num = i + 1
             if i < len(options):
-                formatted[f"answer_{i+1}"] = options[i]
+                # Extract option text - handle both string and dict formats
+                if isinstance(options[i], dict):
+                    option_text = options[i].get("text", "")
+                    option_explanation = options[i].get("explanation", "")
+                else:
+                    option_text = str(options[i])
+                    option_explanation = ""
+                    
+                formatted[f"Answer Option {option_num}"] = option_text
+                formatted[f"Explanation {option_num}"] = option_explanation
             else:
-                formatted[f"answer_{i+1}"] = ""
+                formatted[f"Answer Option {option_num}"] = ""
+                formatted[f"Explanation {option_num}"] = ""
                 
         # Format correct answers (Udemy uses 1-based indexing)
         if question.correct_answers:
-            if len(question.correct_answers) == 1:
-                # Single correct answer
-                formatted["correct_answer"] = str(question.correct_answers[0] + 1)
-            else:
-                # Multiple correct answers - join with commas
-                correct_indices = [str(idx + 1) for idx in question.correct_answers]
-                formatted["correct_answer"] = ",".join(correct_indices)
+            correct_indices = [str(idx + 1) for idx in question.correct_answers]
+            formatted["Correct Answers"] = ",".join(correct_indices)
         else:
-            formatted["correct_answer"] = "1"  # Default fallback
+            formatted["Correct Answers"] = "1"  # Default fallback
             
         return formatted
         
     @staticmethod
     def create_udemy_csv(questions: list[QuestionModel]) -> str:
         """
-        Create CSV content in Udemy format.
+        Create CSV content in Udemy v2 format.
         
         Args:
             questions: List of questions to export
@@ -80,8 +88,14 @@ class ExportService:
         """
         output = io.StringIO()
         fieldnames = [
-            "question", "answer_1", "answer_2", "answer_3", "answer_4", 
-            "correct_answer", "explanation"
+            "Question", "Question Type",
+            "Answer Option 1", "Explanation 1",
+            "Answer Option 2", "Explanation 2", 
+            "Answer Option 3", "Explanation 3",
+            "Answer Option 4", "Explanation 4",
+            "Answer Option 5", "Explanation 5",
+            "Answer Option 6", "Explanation 6",
+            "Correct Answers", "Overall Explanation", "Domain"
         ]
         
         writer = csv.DictWriter(output, fieldnames=fieldnames, quoting=csv.QUOTE_ALL)
@@ -325,14 +339,17 @@ async def get_export_formats() -> Dict[str, Any]:
     """
     formats = {
         "udemy_csv": {
-            "name": "Udemy CSV",
-            "description": "CSV format compatible with Udemy course creation",
+            "name": "Udemy CSV v2",
+            "description": "CSV format compatible with Udemy Practice Test bulk upload template v2",
             "file_extension": ".csv",
             "features": [
                 "Multiple choice questions",
-                "Multiple selection questions", 
-                "Explanations included",
-                "Ready for Udemy upload"
+                "Multi-select questions", 
+                "Up to 6 answer options per question",
+                "Individual explanations per option",
+                "Overall explanations included",
+                "Domain/theme classification",
+                "Ready for Udemy Practice Test upload"
             ]
         },
         "json": {
