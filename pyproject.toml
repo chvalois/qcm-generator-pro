@@ -28,13 +28,27 @@ dependencies = [
     "sqlalchemy>=2.0.0,<3.0.0",
     "python-dotenv>=1.0.0,<2.0.0",
     "pydantic-settings>=2.1.0,<3.0.0",
+    
+    # Phase 3 essentials
+    "pypdf>=3.0.0,<4.0.0",
+    "httpx>=0.25.0,<1.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    # Basic testing and linting only
+    # Testing framework
     "pytest>=7.4.0,<8.0.0",
+    "pytest-cov>=4.1.0,<5.0.0",
+    "pytest-asyncio>=0.21.0,<1.0.0",
+    "pytest-mock>=3.11.0,<4.0.0",
+    
+    # Code quality
     "ruff>=0.0.290,<1.0.0",
+    "black>=23.0.0,<24.0.0",
+    "mypy>=1.5.0,<2.0.0",
+    
+    # Pre-commit hooks
+    "pre-commit>=3.4.0,<4.0.0",
 ]
 
 # Extended dependencies for full features (optional)
@@ -46,15 +60,15 @@ full = [
     # Vector Database
     "chromadb>=0.4.22,<1.0.0",
     
-    # PDF Processing
-    "pypdf>=3.0.0,<4.0.0",
-    
-    # Web Interface
-    "gradio>=4.0.0,<5.0.0",
-    
     # Additional utilities
     "python-multipart>=0.0.6,<1.0.0",
-    "httpx>=0.25.0,<1.0.0",
+]
+
+# UI dependencies
+ui = [
+    # Web Interface
+    "streamlit>=1.28.0,<2.0.0",
+    "stqdm>=0.0.5,<1.0.0",  # Progress bars for Streamlit
 ]
 
 [project.urls]
@@ -178,7 +192,8 @@ module = [
     "spacy.*",
     "pypdf.*",
     "pdfplumber.*",
-    "gradio.*",
+    "streamlit.*",
+    "stqdm.*",
     "langchain.*",
     "sklearn.*",
 ]
@@ -191,10 +206,6 @@ addopts = [
     "-ra",
     "--strict-markers",
     "--strict-config",
-    "--cov=src",
-    "--cov-report=term-missing",
-    "--cov-report=html",
-    "--cov-report=xml",
 ]
 testpaths = ["tests"]
 filterwarnings = [
@@ -207,7 +218,6 @@ markers = [
     "unit: marks tests as unit tests",
     "requires_model: marks tests that require LLM models",
 ]
-asyncio_mode = "auto"
 
 # Coverage Configuration
 [tool.coverage.run]

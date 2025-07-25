@@ -31,6 +31,10 @@
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "YOUR_GITHUB_TOKEN"
       }
+    },
+    "serena": {
+      "command": "/usr/local/bin/uv",
+      "args": ["run", "--directory", "/mnt/c/Users/massi/Dev/serena", "serena-mcp-server"]
     }
   }
 }

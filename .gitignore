@@ -252,6 +252,7 @@ temp/
 .env.local
 .env.production
 .env.development
+.env.docker
 config.json
 secrets.json
 
@@ -286,6 +287,7 @@ documentation/
 .pytest_cache/
 test-results.xml
 test-reports/
+mypy-results.xml
 
 # Test databases
 test_*.db

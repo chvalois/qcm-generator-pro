@@ -1,0 +1,70 @@
+# QCM Generator Pro - Docker Compose Configuration (CPU Only)
+services:
+  # Ollama Service (Local LLM Server - CPU Only)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: qcm_ollama_cpu
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_MAX_LOADED_MODELS=1
+    restart: unless-stopped
+    networks:
+      - qcm_network
+    healthcheck:
+      test: ["CMD", "/bin/ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Main QCM Application (FastAPI + Streamlit)
+  qcm_app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: qcm_generator_pro
+    ports:
+      - "8001:8001"  # FastAPI
+      - "8501:8501"  # Streamlit
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - qcm_uploads:/app/uploads
+    environment:
+      - PYTHONPATH=/app
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - DATABASE_URL=sqlite:///./data/database/qcm_generator.db
+      - DEFAULT_LLM=ollama
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - DEFAULT_LANGUAGE=fr
+      - SUPPORTED_LANGUAGES=["fr","en","es","de"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - qcm_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  ollama_data:
+    driver: local
+  qcm_uploads:
+    driver: local
+
+networks:
+  qcm_network:
+    driver: bridge

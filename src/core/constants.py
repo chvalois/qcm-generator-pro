@@ -236,8 +236,8 @@ EXPORT_FILE_TTL = 7 * 24 * 3600  # 7 days
 # UI Constants
 # ============================================================================
 
-# Gradio settings
-DEFAULT_GRADIO_PORT = 7860
+# Streamlit settings
+DEFAULT_STREAMLIT_PORT = 8501
 MAX_CONCURRENT_SESSIONS = 5
 
 # File upload limits for UI
@@ -268,9 +268,9 @@ SESSION_ID_LENGTH = 32
 # CORS settings
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:3000",
-    "http://localhost:7860",
+    "http://localhost:8501",
     "http://127.0.0.1:3000",
-    "http://127.0.0.1:7860",
+    "http://127.0.0.1:8501",
 ]
 
 # ============================================================================
@@ -294,7 +294,7 @@ MODEL_CONTEXT_LENGTHS = {
     "mistral:7b-instruct": 4096,
     "llama3:8b-instruct": 8192,
     "phi3:medium": 4096,
-    "gpt-3.5-turbo": 4096,
+    "gpt-4o-mini": 4096,
     "gpt-4": 8192,
     "claude-3-haiku-20240307": 200000,
 }

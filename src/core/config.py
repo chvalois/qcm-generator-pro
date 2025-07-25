@@ -41,8 +41,8 @@ class LLMSettings(BaseSettings):
     """LLM configuration settings."""
 
     # Default model configuration
-    default_model: str = Field(default="mistral-local", description="Default LLM model to use")
-    model_type: ModelType = Field(default=ModelType.LOCAL, description="Type of default model")
+    default_model: str = Field(default="gpt-4o-mini", description="Default LLM model to use")
+    model_type: ModelType = Field(default=ModelType.OPENAI, description="Type of default model")
 
     # Local models configuration
     local_models_dir: Path = Field(default=Path("./models"), description="Directory for local models")
@@ -52,7 +52,7 @@ class LLMSettings(BaseSettings):
     # OpenAI configuration
     openai_api_key: str | None = Field(default=None, description="OpenAI API key")
     openai_api_base: str = Field(default="https://api.openai.com/v1", description="OpenAI API base URL")
-    openai_model: str = Field(default="gpt-3.5-turbo", description="Default OpenAI model")
+    openai_model: str = Field(default="gpt-4o-mini", description="Default OpenAI model")
     openai_timeout: int = Field(default=120, description="OpenAI request timeout")
 
     # Anthropic configuration
@@ -75,6 +75,9 @@ class LLMSettings(BaseSettings):
 class VectorStoreSettings(BaseSettings):
     """Vector store configuration settings."""
 
+    # RAG engine configuration
+    engine_type: str = Field(default="simple", description="RAG engine type: 'simple' or 'chromadb'")
+    
     # ChromaDB configuration
     chroma_db_path: Path = Field(default=Path("./data/vectorstore"), description="ChromaDB storage path")
     chroma_collection_name: str = Field(default="qcm_documents", description="ChromaDB collection name")
@@ -182,11 +185,11 @@ class GenerationSettings(BaseSettings):
 class UISettings(BaseSettings):
     """UI configuration settings."""
 
-    # Gradio server configuration
-    server_port: int = Field(default=7860, ge=1024, le=65535, description="Gradio server port")
-    server_name: str = Field(default="127.0.0.1", description="Gradio server host")
-    share: bool = Field(default=False, description="Enable Gradio sharing")
-    debug: bool = Field(default=False, description="Enable Gradio debug mode")
+    # Streamlit server configuration
+    server_port: int = Field(default=8501, ge=1024, le=65535, description="Streamlit server port")
+    server_name: str = Field(default="127.0.0.1", description="Streamlit server host")
+    share: bool = Field(default=False, description="Enable Streamlit sharing")
+    debug: bool = Field(default=False, description="Enable Streamlit debug mode")
 
     # UI limits
     max_file_size_mb: int = Field(default=50, ge=1, le=500, description="Maximum file size in MB")
@@ -204,7 +207,7 @@ class SecuritySettings(BaseSettings):
 
     # CORS configuration
     cors_origins: list[str] = Field(
-        default=["http://localhost:3000", "http://localhost:7860"],
+        default=["http://localhost:3000", "http://localhost:8501"],
         description="CORS allowed origins"
     )
     cors_allow_credentials: bool = Field(default=True, description="Allow CORS credentials")
@@ -336,6 +339,7 @@ class Settings(BaseSettings):
         'env_file_encoding': 'utf-8',
         'case_sensitive': False,
         'validate_assignment': True,
+        'extra': 'ignore',  # Ignore extra environment variables
     }
 
 

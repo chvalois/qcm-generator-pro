@@ -25,7 +25,7 @@ Backend:
   - SQLite + SQLAlchemy (métadonnées)
   
 Frontend:
-  - Gradio 4.0+ (interface simple)
+  - Streamlit 4.0+ (interface simple)
   
 Testing:
   - pytest + pytest-asyncio
@@ -87,7 +87,7 @@ qcm-generator/
 │   │       └── base.py        # Template de base
 │   └── ui/
 │       ├── __init__.py
-│       └── gradio_app.py      # Interface Gradio
+│       └── streamlit_app.py      # Interface Streamlit
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py            # Fixtures pytest
@@ -945,8 +945,8 @@ class Settings(BaseSettings):
     export_dir: Path = data_dir / "exports"
     
     # UI
-    gradio_server_port: int = 7860
-    gradio_share: bool = False
+    streamlit_server_port: int = 8501
+    streamlit_share: bool = False
     
     class Config:
         env_file = ".env"
@@ -1010,7 +1010,7 @@ run:
 	$(PYTHON) -m uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 
 run-ui:
-	$(PYTHON) src/ui/gradio_app.py
+	$(PYTHON) src/ui/streamlit_app.py
 
 setup-models:
 	$(PYTHON) scripts/setup_local_models.py
@@ -1024,7 +1024,7 @@ docker-build:
 	docker build -t $(APP_NAME):latest .
 
 docker-run:
-	docker run -p 8000:8000 -p 7860:7860 -v $(PWD)/data:/app/data $(APP_NAME):latest
+	docker run -p 8000:8000 -p 8501:8501 -v $(PWD)/data:/app/data $(APP_NAME):latest
 
 # Base de données
 db-init:
@@ -1062,7 +1062,7 @@ make setup-models
 
 # 4. Lancer l'application
 make run        # API backend
-make run-ui     # Interface Gradio
+make run-ui     # Interface Streamlit
 
 # 5. Tests
 make test-cov   # Tests avec couverture
@@ -1087,7 +1087,7 @@ src/
 ├── models/     # DB models + schemas
 ├── services/   # Business logic
 ├── prompts/    # Templates multilingues
-└── ui/         # Interface Gradio
+└── ui/         # Interface Streamlit
 ```
 
 ## 🧪 Tests
