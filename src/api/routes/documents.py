@@ -23,6 +23,7 @@ from ...models.schemas import (
 from ...services.pdf_processor import PDFProcessor
 from ...services.rag_engine import add_document_to_rag
 from ...services.theme_extractor import extract_document_themes_sync
+from ...services.document_manager import get_document_chunks
 from ..dependencies import (
     get_db_session,
     get_pdf_processor_service,
@@ -249,6 +250,52 @@ async def get_document(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve document"
+        )
+
+
+@router.get("/{document_id}/chunks", response_model=List[dict])
+async def get_document_chunks_api(
+    document_id: int,
+    db: Session = Depends(get_db_session)
+) -> List[dict]:
+    """
+    Get chunks for a specific document.
+    
+    Args:
+        document_id: Document ID
+        db: Database session
+        
+    Returns:
+        List of document chunks with metadata
+        
+    Raises:
+        HTTPException: If document not found
+    """
+    logger.debug(f"Getting chunks for document: {document_id}")
+    
+    try:
+        # First verify the document exists
+        document = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
+        
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document {document_id} not found"
+            )
+            
+        # Get chunks using the document manager
+        chunks = get_document_chunks(str(document_id))
+        
+        logger.debug(f"Retrieved {len(chunks)} chunks for document {document_id}")
+        return chunks
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get chunks for document {document_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve document chunks"
         )
 
 

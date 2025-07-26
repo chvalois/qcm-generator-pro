@@ -28,7 +28,7 @@ from src.services.qcm_generator import generate_progressive_qcm
 from src.services.rag_engine import add_document_to_rag, get_question_context, get_rag_engine, switch_rag_engine
 from src.services.theme_extractor import extract_document_themes_sync
 from src.services.validator import validate_questions_batch
-from src.services.document_manager import get_document_manager, list_stored_documents, get_available_themes
+from src.services.document_manager import get_document_manager, list_stored_documents, get_available_themes, get_document_chunks, get_stored_document
 
 logger = logging.getLogger(__name__)
 
@@ -825,6 +825,143 @@ def _display_document_statistics(doc: Dict[str, Any]):
                 confidence = theme.get('confidence', 0)
                 st.progress(confidence, text=f"{theme['name']}: {confidence:.2f}")
 
+def _display_document_chunks(doc_id: int, doc: Dict[str, Any]):
+    """Display document chunks with navigation and search functionality."""
+    
+    try:
+        # Get chunks from the database
+        chunks = get_document_chunks(str(doc_id))
+        
+        if not chunks:
+            st.warning("❌ Aucun chunk trouvé pour ce document")
+            return
+        
+        # Basic info
+        st.info(f"📊 **Total :** {len(chunks)} chunks | **Document :** {doc['filename']}")
+        
+        # Search functionality
+        st.markdown("### 🔍 Recherche dans les chunks")
+        search_query = st.text_input("Rechercher dans le contenu des chunks:", key=f"search_chunks_{doc_id}")
+        
+        # Filter chunks based on search
+        filtered_chunks = chunks
+        if search_query:
+            filtered_chunks = [
+                chunk for chunk in chunks 
+                if search_query.lower() in chunk['chunk_text'].lower()
+            ]
+            st.info(f"🔍 {len(filtered_chunks)} chunk(s) trouvé(s) avec '{search_query}'")
+        
+        if not filtered_chunks:
+            st.warning("❌ Aucun chunk ne correspond à votre recherche")
+            return
+        
+        # Navigation
+        st.markdown("### 📝 Navigation des chunks")
+        
+        # Chunk selector
+        chunk_options = [f"Chunk {chunk['chunk_order'] + 1} ({chunk['word_count']} mots)" for chunk in filtered_chunks]
+        selected_index = st.selectbox(
+            "Sélectionner un chunk:",
+            options=range(len(filtered_chunks)),
+            format_func=lambda x: chunk_options[x],
+            key=f"chunk_selector_{doc_id}"
+        )
+        
+        # Navigation buttons
+        col_nav1, col_nav2, col_nav3 = st.columns([1, 2, 1])
+        
+        with col_nav1:
+            if st.button("⬅️ Précédent", disabled=selected_index == 0, key=f"prev_chunk_{doc_id}"):
+                st.session_state[f"chunk_selector_{doc_id}"] = selected_index - 1
+                st.rerun()
+        
+        with col_nav2:
+            st.write(f"**Chunk {selected_index + 1} / {len(filtered_chunks)}**")
+        
+        with col_nav3:
+            if st.button("➡️ Suivant", disabled=selected_index == len(filtered_chunks) - 1, key=f"next_chunk_{doc_id}"):
+                st.session_state[f"chunk_selector_{doc_id}"] = selected_index + 1
+                st.rerun()
+        
+        # Display selected chunk
+        if 0 <= selected_index < len(filtered_chunks):
+            selected_chunk = filtered_chunks[selected_index]
+            
+            # Chunk metadata
+            st.markdown("### 📋 Métadonnées du chunk")
+            col_meta1, col_meta2, col_meta3, col_meta4 = st.columns(4)
+            
+            with col_meta1:
+                st.metric("Ordre", selected_chunk['chunk_order'] + 1)
+            with col_meta2:
+                st.metric("Mots", selected_chunk['word_count'])
+            with col_meta3:
+                st.metric("Caractères", selected_chunk['char_count'])
+            with col_meta4:
+                # Calculate estimated reading time (200 words per minute)
+                reading_time = max(1, selected_chunk['word_count'] // 200)
+                st.metric("Lecture (min)", reading_time)
+            
+            # Additional metadata if available
+            metadata = selected_chunk.get('metadata', {})
+            if any(metadata.values()):
+                st.markdown("**Métadonnées supplémentaires :**")
+                meta_info = []
+                if metadata.get('start_char'):
+                    meta_info.append(f"Position début: {metadata['start_char']}")
+                if metadata.get('end_char'):
+                    meta_info.append(f"Position fin: {metadata['end_char']}")
+                if metadata.get('page_number'):
+                    meta_info.append(f"Page: {metadata['page_number']}")
+                
+                if meta_info:
+                    st.write(" | ".join(meta_info))
+            
+            # Chunk content
+            st.markdown("### 📄 Contenu du chunk")
+            
+            # Highlight search terms if search is active
+            chunk_content = selected_chunk['chunk_text']
+            if search_query:
+                # Simple highlighting (case-insensitive)
+                import re
+                pattern = re.compile(re.escape(search_query), re.IGNORECASE)
+                chunk_content = pattern.sub(f"**{search_query.upper()}**", chunk_content)
+            
+            # Display in a text area for better readability
+            st.text_area(
+                "Contenu:",
+                value=selected_chunk['chunk_text'],
+                height=300,
+                key=f"chunk_content_{doc_id}_{selected_index}",
+                disabled=True
+            )
+            
+            # Export functionality
+            st.markdown("### 📤 Actions")
+            col_export1, col_export2 = st.columns(2)
+            
+            with col_export1:
+                if st.button(f"📋 Copier le chunk", key=f"copy_chunk_{doc_id}_{selected_index}"):
+                    # This would copy to clipboard in a real browser environment
+                    st.success("✅ Contenu copié ! (Utilisez Ctrl+A puis Ctrl+C dans la zone de texte)")
+            
+            with col_export2:
+                # Download chunk as text file
+                chunk_filename = f"chunk_{selected_chunk['chunk_order'] + 1}_{doc['filename'].replace('.pdf', '.txt')}"
+                st.download_button(
+                    "💾 Télécharger chunk",
+                    data=selected_chunk['chunk_text'],
+                    file_name=chunk_filename,
+                    mime="text/plain",
+                    key=f"download_chunk_{doc_id}_{selected_index}"
+                )
+    
+    except Exception as e:
+        st.error(f"❌ Erreur lors du chargement des chunks: {str(e)}")
+        st.exception(e)
+
 
 def create_streamlit_interface():
     """Create the main Streamlit interface."""
@@ -1057,7 +1194,7 @@ def create_streamlit_interface():
                                 
                                 # Individual document actions
                                 st.markdown("---")
-                                col_actions = st.columns(4)
+                                col_actions = st.columns(5)
                                 
                                 with col_actions[0]:
                                     if st.button(f"🎯 Utiliser", key=f"use_{doc_id}"):
@@ -1076,6 +1213,11 @@ def create_streamlit_interface():
                                         st.rerun()
                                 
                                 with col_actions[3]:
+                                    if st.button(f"📝 Chunks", key=f"chunks_{doc_id}"):
+                                        st.session_state.show_document_chunks = doc_id
+                                        st.rerun()
+                                
+                                with col_actions[4]:
                                     if st.button(f"🗑️ Supprimer", key=f"delete_{doc_id}"):
                                         st.session_state.confirm_delete_doc = doc_id
                                         st.rerun()
@@ -1128,6 +1270,17 @@ def create_streamlit_interface():
                             _display_document_statistics(doc)
                             if st.button("❌ Fermer stats"):
                                 st.session_state.show_document_stats = None
+                                st.rerun()
+                    
+                    # Show document chunks if requested
+                    if st.session_state.get('show_document_chunks'):
+                        doc_id = st.session_state.show_document_chunks
+                        doc = next((d for d in stored_docs if d['id'] == doc_id), None)
+                        if doc:
+                            st.subheader(f"📝 Chunks: {doc['filename']}")
+                            _display_document_chunks(doc_id, doc)
+                            if st.button("❌ Fermer chunks"):
+                                st.session_state.show_document_chunks = None
                                 st.rerun()
                 else:
                     st.warning("❌ Aucun document stocké trouvé")
@@ -1230,9 +1383,47 @@ def create_streamlit_interface():
     elif tab_choice == "🎯 Génération QCM":
         st.header("⚡ Génération progressive de questions")
         
-        if not st.session_state.processed_documents:
-            st.warning("⚠️ Veuillez d'abord traiter un document dans la section 'Upload de Documents'")
+        # Check if we have either processed documents from upload or a selected document from management
+        has_processed_docs = bool(st.session_state.processed_documents)
+        has_selected_doc = bool(st.session_state.get('selected_document_for_generation'))
+        
+        if not has_processed_docs and not has_selected_doc:
+            st.warning("⚠️ Veuillez d'abord traiter un document dans la section 'Upload de Documents' ou sélectionner un document dans 'Gestion Documents'")
             return
+        
+        # If we have a selected document from management but no processed documents, load it
+        if has_selected_doc and not has_processed_docs:
+            selected_doc_id = st.session_state.selected_document_for_generation
+            try:
+
+                selected_doc = get_stored_document(str(selected_doc_id))
+                if selected_doc:
+                    # Create a processed_documents entry for compatibility
+                    st.session_state.processed_documents = {
+                        str(selected_doc_id): {
+                            'filename': selected_doc.filename,
+                            'file_path': selected_doc.file_path,
+                            'total_pages': selected_doc.total_pages,
+                            'language': selected_doc.language,
+                            'processing_status': selected_doc.processing_status,
+                            'doc_metadata': selected_doc.doc_metadata or {},
+                            'themes': []  # Will be loaded if needed
+                        }
+                    }
+                    st.success(f"✅ Document sélectionné : {selected_doc.filename}")
+                else:
+                    st.error("❌ Document sélectionné introuvable")
+                    return
+            except Exception as e:
+                st.error(f"❌ Erreur lors du chargement du document : {e}")
+                return
+        
+        # Show currently selected document(s)
+        st.subheader("📄 Document(s) disponible(s) pour génération")
+        if st.session_state.processed_documents:
+            for doc_id, doc_info in st.session_state.processed_documents.items():
+                doc_source = "📤 Upload direct" if not has_selected_doc else "📚 Gestion documents"
+                st.info(f"**{doc_info['filename']}** ({doc_info['total_pages']} pages) - {doc_source}")
         
         col1, col2 = st.columns([1, 2])
         

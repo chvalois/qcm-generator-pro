@@ -7,10 +7,12 @@ This document provides comprehensive context for developing the QCM Generator Pr
 
 To Do Next
 
-- Corriger l'erreur Streamlit dans Génération lorsqu'on initialise une nouvelle session alors que des docs sont déjà chargés (Erreur d'initialisation: 'StreamlitQCMInterface' object has no attribute 'get_available_themes')
-- Corriger l'erreur Streamlit dans Génération Erreur d'initialisation: 'StreamlitQCMInterface' object has no attribute 'initialize_progressive_generation'
-- Corriger CI/CD
-- Corriger export CSV Udemy
+- Améliorer RAG
+- Faire fonctionner avec Docker
+- Faire fonctionner en local sur RTX 4090 avec Ollama
+- Améliorer tests
+- Refactor avec Clean Archi + SOLID
+- Modifier le front avec du React ald Streamlit
 
 ---
 

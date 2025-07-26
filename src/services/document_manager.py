@@ -241,6 +241,46 @@ class DocumentManager:
         except Exception as e:
             logger.error(f"Failed to get themes for document {document_id}: {e}")
             return []
+
+    
+    def get_document_chunks(self, document_id: str) -> List[Dict[str, Any]]:
+        """
+        Get chunks for a specific document.
+        
+        Args:
+            document_id: Document identifier
+            
+        Returns:
+            List of document chunks with metadata
+        """
+        try:
+            with self.get_session() as session:
+                stmt = select(DocumentChunk).where(
+                    DocumentChunk.document_id == document_id
+                ).order_by(DocumentChunk.chunk_order)
+                chunks = session.execute(stmt).scalars().all()
+                
+                result = []
+                for chunk in chunks:
+                    chunk_info = {
+                        "id": chunk.id,
+                        "chunk_order": chunk.chunk_order,
+                        "chunk_text": chunk.chunk_text,
+                        "word_count": chunk.word_count,
+                        "char_count": chunk.char_count,
+                        "metadata": {
+                            "start_char": getattr(chunk, 'start_char', None),
+                            "end_char": getattr(chunk, 'end_char', None),
+                            "page_number": getattr(chunk, 'page_number', None)
+                        }
+                    }
+                    result.append(chunk_info)
+                
+                return result
+                
+        except Exception as e:
+            logger.error(f"Failed to get chunks for document {document_id}: {e}")
+            return []
     
     def get_all_themes(self) -> List[Dict[str, Any]]:
         """
@@ -390,3 +430,8 @@ def get_available_themes() -> List[Dict[str, Any]]:
     """Get all available themes across documents."""
     manager = get_document_manager()
     return manager.get_all_themes()
+
+def get_document_chunks(document_id: str) -> List[Dict[str, Any]]:
+    """Get chunks for a specific document."""
+    manager = get_document_manager()
+    return manager.get_document_chunks(document_id)
