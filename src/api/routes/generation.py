@@ -25,6 +25,7 @@ from ...models.schemas import (
 from ...services.qcm_generator import QCMGenerator
 from ...services.rag_engine import SimpleRAGEngine
 from ...services.validator import QuestionValidator
+from ...services.title_based_generator import get_title_based_generator, TitleSelectionCriteria
 from ..dependencies import (
     get_db_session,
     get_qcm_generator_service,
@@ -774,4 +775,313 @@ async def get_generation_status(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve session status"
+        )
+
+
+# Title-based generation endpoints
+
+@router.get("/documents/{document_id}/title-structure")
+async def get_document_title_structure(
+    document_id: str,
+    db: Session = Depends(get_db_session)
+) -> Dict[str, Any]:
+    """
+    Get the title hierarchy structure for a document.
+    
+    Args:
+        document_id: Document identifier
+        db: Database session
+        
+    Returns:
+        Document title structure with statistics
+    """
+    logger.debug(f"Getting title structure for document: {document_id}")
+    
+    try:
+        # Verify document exists
+        document = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document {document_id} not found"
+            )
+        
+        # Get title structure
+        title_generator = get_title_based_generator()
+        structure = title_generator.get_document_title_structure(document_id)
+        
+        if "error" in structure:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to analyze document structure: {structure['error']}"
+            )
+        
+        return structure
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get title structure for document {document_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to analyze document title structure"
+        )
+
+
+@router.get("/documents/{document_id}/title-suggestions")
+async def get_title_suggestions(
+    document_id: str,
+    min_chunks: int = 3,
+    db: Session = Depends(get_db_session)
+) -> List[Dict[str, Any]]:
+    """
+    Get suggested title selections for question generation.
+    
+    Args:
+        document_id: Document identifier
+        min_chunks: Minimum chunks required for a suggestion
+        db: Database session
+        
+    Returns:
+        List of suggested title selections
+    """
+    logger.debug(f"Getting title suggestions for document: {document_id}")
+    
+    try:
+        # Verify document exists
+        document = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document {document_id} not found"
+            )
+        
+        # Get suggestions
+        title_generator = get_title_based_generator()
+        suggestions = title_generator.get_title_suggestions(document_id, min_chunks)
+        
+        # Convert TitleSelectionCriteria objects to dict for JSON serialization
+        for suggestion in suggestions:
+            if 'criteria' in suggestion:
+                criteria = suggestion['criteria']
+                suggestion['criteria'] = {
+                    'document_id': criteria.document_id,
+                    'h1_title': criteria.h1_title,
+                    'h2_title': criteria.h2_title,
+                    'h3_title': criteria.h3_title,
+                    'h4_title': criteria.h4_title
+                }
+        
+        return suggestions
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get title suggestions for document {document_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get title suggestions"
+        )
+
+
+@router.post("/documents/{document_id}/generate-from-title")
+async def generate_questions_from_title(
+    document_id: str,
+    request: Dict[str, Any],
+    db: Session = Depends(get_db_session)
+) -> Dict[str, Any]:
+    """
+    Generate QCM questions from a specific title selection.
+    
+    Args:
+        document_id: Document identifier
+        request: Generation request with title selection and config
+        db: Database session
+        
+    Returns:
+        Generated questions and metadata
+        
+    Request body should contain:
+    {
+        "title_selection": {
+            "h1_title": "optional H1 title",
+            "h2_title": "optional H2 title", 
+            "h3_title": "optional H3 title",
+            "h4_title": "optional H4 title"
+        },
+        "config": {
+            "num_questions": 5,
+            "language": "fr",
+            "difficulty_distribution": {...},
+            "question_types": {...}
+        },
+        "session_id": "optional session id"
+    }
+    """
+    logger.debug(f"Generating questions from title for document: {document_id}")
+    
+    try:
+        # Verify document exists
+        document = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document {document_id} not found"
+            )
+        
+        # Extract request data
+        title_selection = request.get('title_selection', {})
+        config_data = request.get('config', {})
+        session_id = request.get('session_id')
+        
+        # Create title selection criteria
+        criteria = TitleSelectionCriteria(
+            document_id=document_id,
+            h1_title=title_selection.get('h1_title'),
+            h2_title=title_selection.get('h2_title'),
+            h3_title=title_selection.get('h3_title'),
+            h4_title=title_selection.get('h4_title')
+        )
+        
+        # Create generation config
+        config = GenerationConfig(**config_data)
+        
+        # Generate questions
+        title_generator = get_title_based_generator()
+        questions = await title_generator.generate_questions_from_title(
+            criteria, config, session_id
+        )
+        
+        # Store questions in database if session provided
+        stored_questions = []
+        if session_id:
+            for question in questions:
+                db_question = QuestionModel(
+                    session_id=session_id,
+                    question_text=question.question_text,
+                    question_type=question.question_type.value,
+                    language=question.language.value,
+                    difficulty=question.difficulty.value,
+                    theme=criteria.get_title_path(),
+                    options=[{"text": opt.text, "is_correct": opt.is_correct} for opt in question.options],
+                    correct_answers=[i for i, opt in enumerate(question.options) if opt.is_correct],
+                    explanation=question.explanation,
+                    validation_status=ValidationStatus.PENDING,
+                    metadata={
+                        "generation_source": "title_based",
+                        "title_path": criteria.get_title_path(),
+                        "h1_title": title_selection.get('h1_title', ''),
+                        "h2_title": title_selection.get('h2_title', ''),
+                        "h3_title": title_selection.get('h3_title', ''),
+                        "h4_title": title_selection.get('h4_title', '')
+                    }
+                )
+                db.add(db_question)
+                stored_questions.append(db_question)
+            
+            db.commit()
+            for q in stored_questions:
+                db.refresh(q)
+        
+        # Convert to response format
+        response_questions = []
+        for question in questions:
+            response_questions.append({
+                "question_text": question.question_text,
+                "question_type": question.question_type.value,
+                "language": question.language.value,
+                "difficulty": question.difficulty.value,
+                "theme": criteria.get_title_path(),
+                "options": [{"text": opt.text, "is_correct": opt.is_correct} for opt in question.options],
+                "explanation": question.explanation,
+                "metadata": getattr(question, 'generation_params', {})
+            })
+        
+        return {
+            "questions": response_questions,
+            "generation_info": {
+                "document_id": document_id,
+                "title_path": criteria.get_title_path(),
+                "questions_generated": len(questions),
+                "session_id": session_id,
+                "chunks_used": len(title_generator.get_chunks_for_title_selection(criteria))
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to generate questions from title for document {document_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate questions from title: {str(e)}"
+        )
+
+
+@router.get("/documents/{document_id}/title-chunks")
+async def get_chunks_for_title(
+    document_id: str,
+    h1_title: Optional[str] = None,
+    h2_title: Optional[str] = None,
+    h3_title: Optional[str] = None,
+    h4_title: Optional[str] = None,
+    db: Session = Depends(get_db_session)
+) -> Dict[str, Any]:
+    """
+    Get chunks that match the specified title criteria.
+    
+    Args:
+        document_id: Document identifier
+        h1_title: Optional H1 title filter
+        h2_title: Optional H2 title filter
+        h3_title: Optional H3 title filter
+        h4_title: Optional H4 title filter
+        db: Database session
+        
+    Returns:
+        Matching chunks with metadata
+    """
+    logger.debug(f"Getting chunks for title selection in document: {document_id}")
+    
+    try:
+        # Verify document exists
+        document = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document {document_id} not found"
+            )
+        
+        # Create title selection criteria
+        criteria = TitleSelectionCriteria(
+            document_id=document_id,
+            h1_title=h1_title,
+            h2_title=h2_title,
+            h3_title=h3_title,
+            h4_title=h4_title
+        )
+        
+        # Get matching chunks
+        title_generator = get_title_based_generator()
+        chunks = title_generator.get_chunks_for_title_selection(criteria)
+        
+        return {
+            "title_path": criteria.get_title_path(),
+            "matching_chunks": len(chunks),
+            "chunks": chunks,
+            "selection_criteria": {
+                "h1_title": h1_title,
+                "h2_title": h2_title,
+                "h3_title": h3_title,
+                "h4_title": h4_title
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get chunks for title in document {document_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get chunks for title selection"
         )

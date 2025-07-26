@@ -106,6 +106,18 @@ class SimpleRAGEngine:
         # Create DocumentChunk objects
         document_chunks = []
         for i, chunk_text in enumerate(chunks):
+            # Flatten metadata to ensure Pydantic compatibility
+            flattened_metadata = {}
+            if metadata:
+                for key, value in metadata.items():
+                    if isinstance(value, (dict, list)):
+                        # Convert complex types to strings for Pydantic compatibility
+                        flattened_metadata[key] = json.dumps(value) if value else ""
+                    elif value is not None:
+                        flattened_metadata[key] = str(value)
+                    else:
+                        flattened_metadata[key] = ""
+            
             chunk = DocumentChunk(
                 chunk_id=f"{document_id}_chunk_{i}",
                 document_id=document_id,
@@ -113,7 +125,7 @@ class SimpleRAGEngine:
                 chunk_index=i,
                 start_char=text.find(chunk_text) if chunk_text in text else 0,
                 end_char=text.find(chunk_text) + len(chunk_text) if chunk_text in text else len(chunk_text),
-                metadata=metadata or {},
+                metadata=flattened_metadata,
                 themes=themes or []
             )
             document_chunks.append(chunk)

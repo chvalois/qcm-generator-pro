@@ -1197,7 +1197,7 @@ def create_streamlit_interface():
     st.sidebar.title("🧭 Navigation")
     tab_choice = st.sidebar.radio(
         "Choisir une section:",
-        ["📄 Upload de Documents", "📚 Gestion Documents", "🎯 Génération QCM", "📤 Export", "⚙️ Système"]
+        ["📄 Upload de Documents", "📚 Gestion Documents", "🎯 Génération QCM", "🏷️ Génération par Titre", "📤 Export", "⚙️ Système"]
     )
 
     # Tab 1: Document Upload
@@ -1731,7 +1731,298 @@ def create_streamlit_interface():
                             st.write(f"{marker} {option_text}")
                         st.write(f"**Explication:** {question.explanation}")
 
-    # Tab 4: Export
+    # Tab 4: Title-based Generation
+    elif tab_choice == "🏷️ Génération par Titre":
+        st.header("🏷️ Génération de QCM par titre")
+        
+        # Check if documents are available
+        stored_docs = list_stored_documents()
+        
+        if not stored_docs:
+            st.warning("⚠️ Aucun document disponible. Veuillez d'abord traiter un document.")
+            return
+        
+        # Document selection
+        st.subheader("📄 Sélection du document")
+        
+        doc_options = {f"{doc['filename']} (ID: {doc['id']})": doc['id'] for doc in stored_docs}
+        selected_doc_display = st.selectbox(
+            "Choisir un document:",
+            options=list(doc_options.keys()),
+            help="Sélectionnez le document pour lequel vous souhaitez générer des questions par titre"
+        )
+        
+        if not selected_doc_display:
+            return
+        
+        selected_doc_id = doc_options[selected_doc_display]
+        selected_doc = next(doc for doc in stored_docs if doc['id'] == selected_doc_id)
+        
+        st.info(f"📊 Document sélectionné: **{selected_doc['filename']}** ({selected_doc['total_pages']} pages)")
+        
+        # Get title structure
+        try:
+            from src.services.title_based_generator import get_title_based_generator
+            title_generator = get_title_based_generator()
+            
+            # Show loading while analyzing
+            with st.spinner("🔍 Analyse de la structure des titres..."):
+                title_structure = title_generator.get_document_title_structure(str(selected_doc_id))
+            
+            if "error" in title_structure:
+                st.error(f"❌ Erreur lors de l'analyse: {title_structure['error']}")
+                return
+            
+            # Display structure overview
+            st.subheader("📊 Aperçu de la structure")
+            
+            col_stats1, col_stats2, col_stats3 = st.columns(3)
+            with col_stats1:
+                st.metric("Chunks totaux", title_structure['total_chunks'])
+            with col_stats2:
+                st.metric("Chunks avec titres", title_structure['statistics']['chunks_with_titles'])
+            with col_stats3:
+                st.metric("Titres H1", len(title_structure['h1_titles']))
+            
+            # Title selection interface
+            st.subheader("🎯 Sélection des titres")
+            
+            # Get suggestions
+            suggestions = title_generator.get_title_suggestions(str(selected_doc_id), min_chunks=2)
+            
+            if suggestions:
+                st.info(f"💡 {len(suggestions)} suggestions de titres avec suffisamment de contenu:")
+                
+                # Display suggestions as options
+                suggestion_options = {}
+                for i, suggestion in enumerate(suggestions):
+                    label = f"[{suggestion['level']}] {suggestion['title']} ({suggestion['chunk_count']} chunks)"
+                    suggestion_options[label] = suggestion
+                
+                selected_suggestion = st.selectbox(
+                    "Suggestions automatiques:",
+                    options=["Sélection manuelle"] + list(suggestion_options.keys()),
+                    help="Choisissez une suggestion ou faites une sélection manuelle"
+                )
+                
+                if selected_suggestion != "Sélection manuelle":
+                    suggestion = suggestion_options[selected_suggestion]
+                    st.success(f"✅ Suggestion sélectionnée: {suggestion['description']}")
+                    
+                    # Pre-fill manual selection based on suggestion
+                    criteria = suggestion['criteria']
+                    selected_h1 = criteria.h1_title
+                    selected_h2 = criteria.h2_title
+                    selected_h3 = criteria.h3_title
+                    selected_h4 = criteria.h4_title
+                else:
+                    selected_h1 = None
+                    selected_h2 = None
+                    selected_h3 = None
+                    selected_h4 = None
+            else:
+                st.warning("⚠️ Aucune suggestion disponible. Utilisez la sélection manuelle.")
+                selected_h1 = None
+                selected_h2 = None
+                selected_h3 = None
+                selected_h4 = None
+            
+            # Manual title selection
+            st.subheader("🔧 Sélection manuelle")
+            
+            # Build title options from structure
+            h1_options = ["Tous"] + list(title_structure['h1_titles'].keys())
+            
+            selected_h1_manual = st.selectbox(
+                "Titre H1:",
+                options=h1_options,
+                index=h1_options.index(selected_h1) if selected_h1 and selected_h1 in h1_options else 0,
+                key="manual_h1"
+            )
+            
+            # H2 options depend on H1 selection
+            h2_options = ["Tous"]
+            if selected_h1_manual != "Tous" and selected_h1_manual in title_structure['h1_titles']:
+                h2_options.extend(title_structure['h1_titles'][selected_h1_manual]['h2_titles'].keys())
+            
+            selected_h2_manual = st.selectbox(
+                "Titre H2:",
+                options=h2_options,
+                index=h2_options.index(selected_h2) if selected_h2 and selected_h2 in h2_options else 0,
+                key="manual_h2"
+            )
+            
+            # H3 options depend on H1 and H2 selection
+            h3_options = ["Tous"]
+            if (selected_h1_manual != "Tous" and selected_h2_manual != "Tous" and 
+                selected_h1_manual in title_structure['h1_titles'] and
+                selected_h2_manual in title_structure['h1_titles'][selected_h1_manual]['h2_titles']):
+                h3_options.extend(title_structure['h1_titles'][selected_h1_manual]['h2_titles'][selected_h2_manual]['h3_titles'].keys())
+            
+            selected_h3_manual = st.selectbox(
+                "Titre H3:",
+                options=h3_options,
+                index=h3_options.index(selected_h3) if selected_h3 and selected_h3 in h3_options else 0,
+                key="manual_h3"
+            )
+            
+            # H4 options depend on H1, H2, and H3 selection
+            h4_options = ["Tous"]
+            if (selected_h1_manual != "Tous" and selected_h2_manual != "Tous" and selected_h3_manual != "Tous" and
+                selected_h1_manual in title_structure['h1_titles'] and
+                selected_h2_manual in title_structure['h1_titles'][selected_h1_manual]['h2_titles'] and
+                selected_h3_manual in title_structure['h1_titles'][selected_h1_manual]['h2_titles'][selected_h2_manual]['h3_titles']):
+                h4_options.extend(title_structure['h1_titles'][selected_h1_manual]['h2_titles'][selected_h2_manual]['h3_titles'][selected_h3_manual]['h4_titles'].keys())
+            
+            selected_h4_manual = st.selectbox(
+                "Titre H4:",
+                options=h4_options,
+                index=h4_options.index(selected_h4) if selected_h4 and selected_h4 in h4_options else 0,
+                key="manual_h4"
+            )
+            
+            # Create final selection criteria
+            final_h1 = selected_h1_manual if selected_h1_manual != "Tous" else None
+            final_h2 = selected_h2_manual if selected_h2_manual != "Tous" else None
+            final_h3 = selected_h3_manual if selected_h3_manual != "Tous" else None
+            final_h4 = selected_h4_manual if selected_h4_manual != "Tous" else None
+            
+            # Preview selection
+            if any([final_h1, final_h2, final_h3, final_h4]):
+                from src.services.title_based_generator import TitleSelectionCriteria
+                
+                criteria = TitleSelectionCriteria(
+                    document_id=str(selected_doc_id),
+                    h1_title=final_h1,
+                    h2_title=final_h2,
+                    h3_title=final_h3,
+                    h4_title=final_h4
+                )
+                
+                # Get matching chunks preview
+                matching_chunks = title_generator.get_chunks_for_title_selection(criteria)
+                
+                st.subheader("📋 Aperçu de la sélection")
+                st.info(f"📍 **Chemin sélectionné:** {criteria.get_title_path()}")
+                st.info(f"📊 **Chunks correspondants:** {len(matching_chunks)}")
+                
+                if len(matching_chunks) < 2:
+                    st.warning("⚠️ Peu de contenu disponible pour cette sélection. Considérez élargir votre sélection.")
+                elif len(matching_chunks) > 50:
+                    st.warning("⚠️ Beaucoup de contenu sélectionné. Considérez affiner votre sélection pour de meilleurs résultats.")
+                
+                # Generation configuration
+                st.subheader("⚙️ Configuration de génération")
+                
+                col_config1, col_config2 = st.columns(2)
+                
+                with col_config1:
+                    num_questions_title = st.slider(
+                        "Nombre de questions:",
+                        min_value=1,
+                        max_value=min(20, max(5, len(matching_chunks) // 3)),
+                        value=min(5, max(1, len(matching_chunks) // 5)),
+                        help="Recommandé: 1 question pour 3-5 chunks"
+                    )
+                    
+                    language_title = st.selectbox(
+                        "Langue:",
+                        options=["fr", "en"],
+                        index=0
+                    )
+                
+                with col_config2:
+                    difficulty_title = st.selectbox(
+                        "Difficulté:",
+                        options=["mixed", "easy", "medium", "hard"],
+                        index=0,
+                        help="Mixed: mélange automatique des difficultés"
+                    )
+                    
+                    question_type_title = st.selectbox(
+                        "Type de questions:",
+                        options=["mixed", "multiple-choice", "multiple-selection"],
+                        index=0,
+                        help="Mixed: mélange de choix unique et multiple"
+                    )
+                
+                # Generate button
+                if st.button("🚀 Générer questions depuis titre", type="primary"):
+                    with st.spinner("🔄 Génération en cours..."):
+                        try:
+                            from src.models.schemas import GenerationConfig
+                            from src.models.enums import Language, Difficulty, QuestionType
+                            
+                            # Create configuration
+                            if difficulty_title == "mixed":
+                                difficulty_dist = {
+                                    Difficulty.EASY: 0.3,
+                                    Difficulty.MEDIUM: 0.5,
+                                    Difficulty.HARD: 0.2
+                                }
+                            else:
+                                difficulty_dist = {Difficulty(difficulty_title): 1.0}
+                            
+                            if question_type_title == "mixed":
+                                type_dist = {
+                                    QuestionType.MULTIPLE_CHOICE: 0.7,
+                                    QuestionType.MULTIPLE_SELECTION: 0.3
+                                }
+                            else:
+                                type_dist = {QuestionType(question_type_title.replace('-', '_').upper()): 1.0}
+                            
+                            config = GenerationConfig(
+                                num_questions=num_questions_title,
+                                language=Language(language_title),
+                                difficulty_distribution=difficulty_dist,
+                                question_types=type_dist
+                            )
+                            
+                            # Generate questions
+                            import asyncio
+                            questions = asyncio.run(title_generator.generate_questions_from_title(
+                                criteria, config, f"title_session_{abs(hash(criteria.get_title_path())) % 10000}"
+                            ))
+                            
+                            if questions:
+                                # Store in session state
+                                st.session_state.generated_questions = questions
+                                st.session_state.current_session_id = f"title_{abs(hash(criteria.get_title_path())) % 10000}"
+                                
+                                st.success(f"✅ {len(questions)} questions générées avec succès!")
+                                
+                                # Display generated questions
+                                st.subheader("📝 Questions générées")
+                                
+                                for i, question in enumerate(questions):
+                                    with st.expander(f"Question {i+1} - {question.difficulty.value if hasattr(question.difficulty, 'value') else question.difficulty}"):
+                                        st.write(f"**Titre source:** {criteria.get_title_path()}")
+                                        st.write(f"**Question:** {question.question_text}")
+                                        st.write("**Options:**")
+                                        
+                                        for j, option in enumerate(question.options):
+                                            option_text = option.text if hasattr(option, 'text') else str(option)
+                                            is_correct = option.is_correct if hasattr(option, 'is_correct') else False
+                                            marker = "✅" if is_correct else "❌"
+                                            st.write(f"{marker} {option_text}")
+                                        
+                                        st.write(f"**Explication:** {question.explanation}")
+                                
+                                st.info("💡 Les questions ont été ajoutées à la session. Vous pouvez les exporter dans la section 'Export'.")
+                            else:
+                                st.error("❌ Aucune question générée. Vérifiez la sélection et réessayez.")
+                        
+                        except Exception as e:
+                            st.error(f"❌ Erreur lors de la génération: {str(e)}")
+                            logger.error(f"Title-based generation failed: {e}")
+            else:
+                st.info("👆 Sélectionnez au moins un niveau de titre pour continuer")
+        
+        except Exception as e:
+            st.error(f"❌ Erreur lors du chargement du service de génération par titre: {str(e)}")
+            logger.error(f"Failed to load title-based generator: {e}")
+
+    # Tab 5: Export
     elif tab_choice == "📤 Export":
         st.header("💾 Export des questions générées")
 
