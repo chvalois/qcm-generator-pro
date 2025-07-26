@@ -7,7 +7,8 @@ This document provides comprehensive context for developing the QCM Generator Pr
 
 To Do Next
 
-- Améliorer RAG
+- Améliorer RAG avec screening de la hiérarchie des fichiers uploadés : détection des titres
+- Ajouter des exemples de questions attendues
 - Faire fonctionner avec Docker
 - Faire fonctionner en local sur RTX 4090 avec Ollama
 - Améliorer tests

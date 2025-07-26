@@ -288,6 +288,27 @@ class PDFProcessor:
         # Chunk text for processing
         chunks = self.chunk_text(full_text, config)
         
+        # Detect title hierarchy
+        title_candidates = []
+        try:
+            from .title_detector import detect_document_titles
+            title_candidates = detect_document_titles(full_text, pages_data)
+            logger.info(f"Detected {len(title_candidates)} title candidates")
+        except Exception as e:
+            logger.warning(f"Title detection failed: {e}")
+        
+        # Add title information to metadata
+        metadata["detected_titles"] = [
+            {
+                "text": title.text,
+                "level": title.level,
+                "confidence": title.confidence,
+                "page_number": title.page_number,
+                "features": title.features
+            }
+            for title in title_candidates
+        ]
+        
         # Create document creation schema
         document_data = DocumentCreate(
             filename=file_path.name,

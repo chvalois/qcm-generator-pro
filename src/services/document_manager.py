@@ -243,15 +243,16 @@ class DocumentManager:
             return []
 
     
-    def get_document_chunks(self, document_id: str) -> List[Dict[str, Any]]:
+    def get_document_chunks(self, document_id: str, include_titles: bool = True) -> List[Dict[str, Any]]:
         """
-        Get chunks for a specific document.
+        Get chunks for a specific document with optional title hierarchy.
         
         Args:
             document_id: Document identifier
+            include_titles: Whether to include title hierarchy information
             
         Returns:
-            List of document chunks with metadata
+            List of document chunks with metadata and title hierarchy
         """
         try:
             with self.get_session() as session:
@@ -260,8 +261,48 @@ class DocumentManager:
                 ).order_by(DocumentChunk.chunk_order)
                 chunks = session.execute(stmt).scalars().all()
                 
+                # Get document information for title extraction
+                doc_stmt = select(Document).where(Document.id == document_id)
+                document = session.execute(doc_stmt).scalar_one_or_none()
+                
+                title_hierarchies = []
+                if include_titles and document:
+                    try:
+                        # Import here to avoid circular imports
+                        from .title_detector import build_chunk_title_hierarchies
+                        from .pdf_processor import PDFProcessor
+                        
+                        # Get or reconstruct pages data
+                        processor = PDFProcessor()
+                        pages_data = processor.extract_text_by_pages(Path(document.file_path))
+                        
+                        # Extract chunk texts
+                        chunk_texts = [chunk.chunk_text for chunk in chunks]
+                        
+                        # Reconstruct full text from pages if needed
+                        full_text = ""
+                        if hasattr(document, 'full_text') and document.full_text:
+                            full_text = document.full_text
+                        else:
+                            # Reconstruct from pages data
+                            full_text = "\n".join(page.get('text', '') for page in pages_data)
+                        
+                        # Build title hierarchies
+                        title_hierarchies = build_chunk_title_hierarchies(
+                            chunk_texts, 
+                            full_text,
+                            pages_data
+                        )
+                        
+                    except Exception as e:
+                        logger.warning(f"Failed to extract title hierarchies: {e}")
+                        title_hierarchies = []
+                
                 result = []
-                for chunk in chunks:
+                for i, chunk in enumerate(chunks):
+                    # Get title hierarchy for this chunk
+                    hierarchy = title_hierarchies[i] if i < len(title_hierarchies) else None
+                    
                     chunk_info = {
                         "id": chunk.id,
                         "chunk_order": chunk.chunk_order,
@@ -272,7 +313,14 @@ class DocumentManager:
                             "start_char": getattr(chunk, 'start_char', None),
                             "end_char": getattr(chunk, 'end_char', None),
                             "page_number": getattr(chunk, 'page_number', None)
-                        }
+                        },
+                        "title_hierarchy": {
+                            "h1_title": hierarchy.h1_title if hierarchy else None,
+                            "h2_title": hierarchy.h2_title if hierarchy else None,
+                            "h3_title": hierarchy.h3_title if hierarchy else None,
+                            "h4_title": hierarchy.h4_title if hierarchy else None,
+                            "full_path": hierarchy.get_full_path() if hierarchy else None
+                        } if include_titles else None
                     }
                     result.append(chunk_info)
                 
@@ -431,7 +479,7 @@ def get_available_themes() -> List[Dict[str, Any]]:
     manager = get_document_manager()
     return manager.get_all_themes()
 
-def get_document_chunks(document_id: str) -> List[Dict[str, Any]]:
-    """Get chunks for a specific document."""
+def get_document_chunks(document_id: str, include_titles: bool = True) -> List[Dict[str, Any]]:
+    """Get chunks for a specific document with optional title hierarchy."""
     manager = get_document_manager()
-    return manager.get_document_chunks(document_id)
+    return manager.get_document_chunks(document_id, include_titles)
