@@ -1787,7 +1787,7 @@ def create_streamlit_interface():
             num_questions = st.slider(
                 "Nombre de questions",
                 min_value=1,
-                max_value=50,
+                max_value=100,
                 value=10,
                 help="Nombre total de questions à générer"
             )
@@ -2098,12 +2098,40 @@ def create_streamlit_interface():
                 col_config1, col_config2 = st.columns(2)
                 
                 with col_config1:
+                    # Determine title level and corresponding limits
+                    title_level = None
+                    max_questions = 20  # Default
+                    
+                    if final_h4:
+                        title_level = "H4"
+                        max_questions = 10
+                    elif final_h3:
+                        title_level = "H3"
+                        max_questions = 20
+                    elif final_h2:
+                        title_level = "H2"
+                        max_questions = 50
+                    elif final_h1:
+                        title_level = "H1"
+                        max_questions = 100
+                    
+                    # Calculate word count for recommendation
+                    total_words = sum(chunk.get('word_count', len(chunk.get('chunk_text', '').split())) 
+                                    for chunk in matching_chunks)
+                    recommended_questions = max(1, min(total_words // 100, max_questions))
+                    
+                    # Display recommendation info
+                    st.info(f"📊 **Niveau sélectionné:** {title_level or 'Multiple'} | "
+                           f"**Mots:** {total_words:,} | "
+                           f"**Recommandé:** {recommended_questions} questions")
+                    
                     num_questions_title = st.slider(
                         "Nombre de questions:",
                         min_value=1,
-                        max_value=min(20, max(5, len(matching_chunks) // 3)),
-                        value=min(5, max(1, len(matching_chunks) // 5)),
-                        help="Recommandé: 1 question pour 3-5 chunks"
+                        max_value=max_questions,
+                        value=min(recommended_questions, max_questions),
+                        help=f"Max {max_questions} questions pour niveau {title_level or 'Multiple'} • "
+                             f"Recommandation: 1 question pour 100 mots (~{total_words//100 or 1} questions)"
                     )
                     
                     language_title = st.selectbox(

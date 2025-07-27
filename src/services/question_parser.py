@@ -389,6 +389,70 @@ class QuestionParser:
             # It's a string
             return QuestionType(question_type_value)
     
+    def _update_explanation_indices(self, explanation: str) -> str:
+        """
+        Update explanation text to use 1-based indexing for better user experience.
+        
+        Args:
+            explanation: Raw explanation text with 0-based indices
+            
+        Returns:
+            Updated explanation with 1-based indices
+        """
+        if not explanation:
+            return explanation
+        
+        import re
+        
+        # Pattern to match common index references
+        patterns = [
+            # More comprehensive patterns for all answer reference formats
+            # "La réponse 0", "La réponse 1", "L'option 0", "L'affirmation 0", "La proposition 0" etc.
+            (r'\b(La?\s+)?(réponse|option|answer|choix|affirmation|proposition)\s+(\d+)\b', 
+             lambda m: f"{m.group(1) or ''}{m.group(2)} {int(m.group(3)) + 1}"),
+            
+            # "réponses 0, 2 et 3", "affirmations 0 et 2", "propositions 0 et 2", "answers 0, 2 and 3" - Convert all numbers to 1-based
+            (r'\b(Les?\s+)?(réponses?|answers?|options?|choix|affirmations?|propositions?)\s+([0-9,\s]+(?:et|and)\s+[0-9]+)', 
+             lambda m: f"{m.group(1) or ''}{self._convert_number_list(m.group(0))[len(m.group(1) or ''):]}"),
+            
+            # "(0)", "(1)", etc. when referring to options - Convert to 1-based
+            (r'\((\d+)\)', lambda m: f"({int(m.group(1)) + 1})"),
+            
+            # Handle complex patterns like "Les réponses 0 et 2", "Les affirmations 0 et 2", "Les propositions 0 et 2"
+            (r'\b(Les?\s+)(réponses?|options?|answers?|choix|affirmations?|propositions?)\s+(\d+)(\s+et\s+)(\d+)\b',
+             lambda m: f"{m.group(1)}{m.group(2)} {int(m.group(3)) + 1}{m.group(4)}{int(m.group(5)) + 1}"),
+            
+            # Handle even more complex patterns like "Les affirmations 0, 2 et 3", "Les propositions 0, 2 et 3"
+            (r'\b(Les?\s+)(affirmations?|réponses?|options?|answers?|choix|propositions?)\s+((?:\d+,?\s*)+(?:et\s+\d+)?)\b',
+             lambda m: f"{m.group(1)}{m.group(2)} {self._convert_number_sequence(m.group(3))}"),
+        ]
+        
+        updated_explanation = explanation
+        for pattern, replacement in patterns:
+            updated_explanation = re.sub(pattern, replacement, updated_explanation, flags=re.IGNORECASE)
+        
+        return updated_explanation
+    
+    def _convert_number_list(self, text: str) -> str:
+        """Convert a list of 0-based numbers to 1-based in text like 'réponses 0, 2 et 3'."""
+        import re
+        
+        def replace_number(match):
+            return str(int(match.group(0)) + 1)
+        
+        # Replace all individual numbers in the text
+        return re.sub(r'\b\d+\b', replace_number, text)
+    
+    def _convert_number_sequence(self, sequence: str) -> str:
+        """Convert a sequence of 0-based numbers to 1-based like '0, 2 et 3' -> '1, 3 et 4'."""
+        import re
+        
+        def replace_number(match):
+            return str(int(match.group(0)) + 1)
+        
+        # Replace all individual numbers in the sequence
+        return re.sub(r'\b\d+\b', replace_number, sequence)
+
     def _process_source_chunks(self, source_chunks: Optional[List[Any]]) -> Optional[List[str]]:
         """Process source chunks into string format."""
         if not source_chunks:
@@ -453,7 +517,7 @@ class QuestionParser:
                 language=language,
                 difficulty=difficulty,
                 options=options,
-                explanation=question_data["explanation"],
+                explanation=self._update_explanation_indices(question_data["explanation"]),
                 
                 # Required fields from QuestionCreate
                 document_id=document_id,
@@ -477,7 +541,7 @@ class QuestionParser:
                     language=language,
                     difficulty=difficulty,
                     options=options,
-                    explanation=question_data["explanation"],
+                    explanation=self._update_explanation_indices(question_data["explanation"]),
                     document_id=document_id,
                     session_id=session_id,
                     generation_order=0,
