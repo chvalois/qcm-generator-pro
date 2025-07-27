@@ -120,16 +120,32 @@ class DocumentManager:
                     )
                     session.add(doc_theme)
                 
-                # Store chunks
-                for i, chunk_text in enumerate(document_data.chunks):
-                    doc_chunk = DocumentChunk(
-                        document_id=document_id,
-                        chunk_text=chunk_text,
-                        chunk_order=i,
-                        word_count=len(chunk_text.split()),
-                        char_count=len(chunk_text)
-                    )
-                    session.add(doc_chunk)
+                # Store chunks with page information
+                chunks_data = getattr(document_data, 'chunks_with_pages', None)
+                if chunks_data:
+                    # Use new chunks with page information
+                    for i, chunk_data in enumerate(chunks_data):
+                        doc_chunk = DocumentChunk(
+                            document_id=document_id,
+                            chunk_text=chunk_data['text'],
+                            chunk_order=i,
+                            start_page=chunk_data.get('start_page'),
+                            end_page=chunk_data.get('end_page'),
+                            word_count=chunk_data.get('word_count', len(chunk_data['text'].split())),
+                            char_count=chunk_data.get('char_count', len(chunk_data['text']))
+                        )
+                        session.add(doc_chunk)
+                else:
+                    # Fallback to old chunks format
+                    for i, chunk_text in enumerate(document_data.chunks):
+                        doc_chunk = DocumentChunk(
+                            document_id=document_id,
+                            chunk_text=chunk_text,
+                            chunk_order=i,
+                            word_count=len(chunk_text.split()),
+                            char_count=len(chunk_text)
+                        )
+                        session.add(doc_chunk)
                 
                 session.commit()
                 session.refresh(document)
@@ -276,8 +292,22 @@ class DocumentManager:
                         processor = PDFProcessor()
                         pages_data = processor.extract_text_by_pages(Path(document.file_path))
                         
-                        # Extract chunk texts
+                        # Extract chunk texts and page info
                         chunk_texts = [chunk.chunk_text for chunk in chunks]
+                        
+                        # Build chunks_with_pages from database chunks
+                        chunks_with_pages = []
+                        for i, chunk in enumerate(chunks):
+                            chunk_data = {
+                                'text': chunk.chunk_text,
+                                'chunk_id': i,
+                                'start_page': chunk.start_page or 1,
+                                'end_page': chunk.end_page or chunk.start_page or 1,
+                                'page_numbers': [chunk.start_page or 1] if chunk.start_page else [1],
+                                'word_count': chunk.word_count or len(chunk.chunk_text.split()),
+                                'char_count': chunk.char_count
+                            }
+                            chunks_with_pages.append(chunk_data)
                         
                         # Reconstruct full text from pages if needed
                         full_text = ""
@@ -287,11 +317,13 @@ class DocumentManager:
                             # Reconstruct from pages data
                             full_text = "\n".join(page.get('text', '') for page in pages_data)
                         
-                        # Build title hierarchies
+                        # Build title hierarchies with page info
                         title_hierarchies = build_chunk_title_hierarchies(
                             chunk_texts, 
                             full_text,
-                            pages_data
+                            pages_data,
+                            custom_config=None,
+                            chunks_with_pages=chunks_with_pages
                         )
                         
                     except Exception as e:
@@ -309,6 +341,9 @@ class DocumentManager:
                         "chunk_text": chunk.chunk_text,
                         "word_count": chunk.word_count,
                         "char_count": chunk.char_count,
+                        "start_page": getattr(chunk, 'start_page', None),
+                        "end_page": getattr(chunk, 'end_page', None),
+                        "page_numbers": [chunk.start_page] if getattr(chunk, 'start_page', None) else [],
                         "metadata": {
                             "start_char": getattr(chunk, 'start_char', None),
                             "end_char": getattr(chunk, 'end_char', None),

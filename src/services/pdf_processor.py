@@ -8,7 +8,7 @@ metadata parsing, and document chunking for QCM generation.
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List
 
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
@@ -194,16 +194,138 @@ class PDFProcessor:
         except Exception as e:
             raise PDFProcessingError(f"Page-level extraction failed: {e}")
             
-    def chunk_text(self, text: str, config: ProcessingConfig | None = None) -> list[str]:
+    def chunk_text_with_pages(
+        self, 
+        pages_data: List[Dict[str, Any]], 
+        config: ProcessingConfig | None = None
+    ) -> List[Dict[str, Any]]:
         """
-        Split text into chunks for processing.
+        Split pages into chunks while preserving page information.
         
         Args:
-            text: Text to chunk
+            pages_data: List of page data with text and page numbers
             config: Processing configuration
             
         Returns:
-            List of text chunks
+            List of chunk dictionaries with text, start_page, end_page, etc.
+        """
+        if config is None:
+            chunk_size = settings.processing.default_chunk_size
+            chunk_overlap = settings.processing.default_chunk_overlap
+        else:
+            chunk_size = config.chunk_size
+            chunk_overlap = config.chunk_overlap
+            
+        if not pages_data:
+            return []
+            
+        chunks_with_pages = []
+        chunk_id = 0
+        
+        # Create individual chunks for each page first, then combine if needed
+        page_chunks = []
+        
+        # First pass: create chunks per page
+        for page_data in pages_data:
+            page_text = page_data.get('text', '').strip()
+            page_num = page_data.get('page_number', 1)
+            
+            if not page_text:
+                continue
+            
+            # Split this page into chunks if it's too large
+            page_text_chunks = []
+            if len(page_text) <= chunk_size:
+                # Page fits in one chunk
+                page_text_chunks = [page_text]
+            else:
+                # Split page into multiple chunks
+                start = 0
+                while start < len(page_text):
+                    end = start + chunk_size
+                    
+                    if end < len(page_text):
+                        # Look for sentence ending
+                        search_start = max(start + chunk_size - 200, start)
+                        best_break = -1
+                        for ending in ['.', '!', '?', '\n\n']:
+                            pos = page_text.rfind(ending, search_start, end)
+                            if pos > best_break:
+                                best_break = pos
+                        
+                        if best_break > start:
+                            end = best_break + 1
+                        else:
+                            # Fall back to word boundary
+                            word_break = page_text.rfind(' ', start, end)
+                            if word_break > start:
+                                end = word_break
+                    
+                    chunk_text = page_text[start:end].strip()
+                    if chunk_text:
+                        page_text_chunks.append(chunk_text)
+                    
+                    start = max(start + chunk_size - chunk_overlap, end)
+            
+            # Create chunk data for each text chunk on this page
+            for chunk_text in page_text_chunks:
+                chunk_data = {
+                    'text': chunk_text,
+                    'chunk_id': chunk_id,
+                    'start_page': page_num,
+                    'end_page': page_num,
+                    'page_numbers': [page_num],
+                    'word_count': len(chunk_text.split()),
+                    'char_count': len(chunk_text)
+                }
+                page_chunks.append(chunk_data)
+                
+                logger.debug(
+                    f"Created chunk {chunk_id} on page {page_num}: "
+                    f"text: {chunk_text[:50]}..."
+                )
+                
+                chunk_id += 1
+        
+        # Second pass: merge small adjacent chunks if beneficial
+        chunks_with_pages = []
+        i = 0
+        while i < len(page_chunks):
+            current_chunk = page_chunks[i]
+            
+            # Try to merge with next chunk if both are small and on adjacent pages
+            if (i + 1 < len(page_chunks) and 
+                current_chunk['char_count'] + page_chunks[i + 1]['char_count'] <= chunk_size and
+                page_chunks[i + 1]['start_page'] <= current_chunk['end_page'] + 1):
+                
+                next_chunk = page_chunks[i + 1]
+                merged_chunk = {
+                    'text': current_chunk['text'] + '\n\n' + next_chunk['text'],
+                    'chunk_id': current_chunk['chunk_id'],
+                    'start_page': current_chunk['start_page'],
+                    'end_page': next_chunk['end_page'],
+                    'page_numbers': list(set(current_chunk['page_numbers'] + next_chunk['page_numbers'])),
+                    'word_count': current_chunk['word_count'] + next_chunk['word_count'],
+                    'char_count': current_chunk['char_count'] + next_chunk['char_count'] + 2
+                }
+                chunks_with_pages.append(merged_chunk)
+                
+                logger.debug(
+                    f"Merged chunks {current_chunk['chunk_id']} and {next_chunk['chunk_id']}: "
+                    f"pages {merged_chunk['start_page']}-{merged_chunk['end_page']}"
+                )
+                
+                i += 2  # Skip next chunk as it's been merged
+            else:
+                chunks_with_pages.append(current_chunk)
+                i += 1
+        
+        return chunks_with_pages
+
+    def chunk_text(self, text: str, config: ProcessingConfig | None = None) -> list[str]:
+        """
+        Legacy method - Split text into chunks (without page info).
+        Use chunk_text_with_pages() for new implementations.
         """
         if config is None:
             chunk_size = settings.processing.default_chunk_size
@@ -215,18 +337,14 @@ class PDFProcessor:
         if not text.strip():
             return []
             
-        # Simple character-based chunking
         chunks = []
         start = 0
         text_length = len(text)
         
         while start < text_length:
-            # Calculate end position
             end = start + chunk_size
             
-            # If we're not at the end, try to break at a sentence or word boundary
             if end < text_length:
-                # Look for sentence ending within the last 200 characters
                 search_start = max(start + chunk_size - 200, start)
                 sentence_endings = ['.', '!', '?', '\n\n']
                 
@@ -239,7 +357,6 @@ class PDFProcessor:
                 if best_break > start:
                     end = best_break + 1
                 else:
-                    # Fall back to word boundary
                     word_break = text.rfind(' ', start, end)
                     if word_break > start:
                         end = word_break
@@ -248,7 +365,6 @@ class PDFProcessor:
             if chunk:
                 chunks.append(chunk)
                 
-            # Move start position with overlap
             start = max(start + chunk_size - chunk_overlap, end)
             
         return chunks
@@ -285,14 +401,23 @@ class PDFProcessor:
         # Extract page-level data
         pages_data = self.extract_text_by_pages(file_path)
         
-        # Chunk text for processing
-        chunks = self.chunk_text(full_text, config)
+        # Chunk text for processing with page information
+        chunks_with_pages = self.chunk_text_with_pages(pages_data, config)
+        
+        # Extract just the text for backward compatibility where needed
+        chunks = [chunk['text'] for chunk in chunks_with_pages]
         
         # Detect title hierarchy
         title_candidates = []
         try:
             from .title_detector import detect_document_titles
-            title_candidates = detect_document_titles(full_text, pages_data)
+            
+            # Use custom title configuration if provided
+            custom_config = None
+            if config and hasattr(config, 'title_structure') and config.title_structure:
+                custom_config = config.title_structure
+            
+            title_candidates = detect_document_titles(full_text, pages_data, custom_config)
             logger.info(f"Detected {len(title_candidates)} title candidates")
         except Exception as e:
             logger.warning(f"Title detection failed: {e}")
@@ -309,6 +434,9 @@ class PDFProcessor:
             for title in title_candidates
         ]
         
+        # Create a structured title summary for display
+        metadata["title_structure"] = self._create_title_structure_summary(title_candidates)
+        
         # Create document creation schema
         document_data = DocumentCreate(
             filename=file_path.name,
@@ -320,6 +448,7 @@ class PDFProcessor:
             full_text=full_text,
             pages_data=pages_data,
             chunks=chunks,
+            chunks_with_pages=chunks_with_pages,
         )
         
         logger.info(
@@ -328,6 +457,52 @@ class PDFProcessor:
         )
         
         return document_data
+    
+    def _create_title_structure_summary(self, title_candidates: list) -> dict[str, Any]:
+        """
+        Create a structured summary of detected titles for UI display.
+        
+        Args:
+            title_candidates: List of detected title candidates
+            
+        Returns:
+            Dictionary with organized title structure
+        """
+        if not title_candidates:
+            return {"levels": {}, "total_titles": 0, "pages_with_titles": 0}
+        
+        # Filter titles with reasonable confidence
+        filtered_titles = [
+            title for title in title_candidates 
+            if title.confidence > 0.5
+        ]
+        
+        # Organize by level and page
+        levels = {}
+        pages_with_titles = set()
+        
+        for title in filtered_titles:
+            level = f"H{title.level}"
+            if level not in levels:
+                levels[level] = []
+            
+            levels[level].append({
+                "text": title.text,
+                "page": title.page_number,
+                "confidence": round(title.confidence, 2)
+            })
+            pages_with_titles.add(title.page_number)
+        
+        # Sort titles by page within each level
+        for level_titles in levels.values():
+            level_titles.sort(key=lambda x: x["page"])
+        
+        return {
+            "levels": levels,
+            "total_titles": len(filtered_titles),
+            "pages_with_titles": len(pages_with_titles),
+            "level_counts": {level: len(titles) for level, titles in levels.items()}
+        }
 
 
 # Convenience functions

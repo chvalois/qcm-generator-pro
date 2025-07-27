@@ -9,6 +9,7 @@ To Do Next
 
 - Améliorer RAG avec screening de la hiérarchie des fichiers uploadés : détection des titres (vérifier que chaque chunk se voit associé des titres logiques et exhaustifs)
 => si titre H1, chaque chunk se voit affecter ce titre H1 jusqu'au prochain titre H1, etc. 
+- Regarder du côté de : https://github.com/huridocs/pdf-document-layout-analysis
 - Ajouter des exemples de questions attendues
 - Faire fonctionner avec Docker
 - Faire fonctionner en local sur RTX 4090 avec Ollama

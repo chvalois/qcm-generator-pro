@@ -91,7 +91,64 @@ class StreamlitQCMInterface:
                 return new_path
             counter += 1
 
-    def upload_and_process_document(self, file) -> tuple[str, str, str]:
+    def _display_title_structure(self, metadata: dict) -> None:
+        """Display detected title structure in a user-friendly format."""
+        title_structure = metadata.get("title_structure", {})
+        
+        if not title_structure or title_structure.get("total_titles", 0) == 0:
+            st.info("ℹ️ Aucune structure de titres détectée dans ce document.")
+            return
+        
+        st.subheader("📋 Structure des titres détectée")
+        
+        # Summary
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Titres détectés", title_structure.get("total_titles", 0))
+        with col2:
+            st.metric("Pages avec titres", title_structure.get("pages_with_titles", 0))
+        with col3:
+            level_counts = title_structure.get("level_counts", {})
+            max_level = max(len(level_counts.keys()), 1)
+            st.metric("Niveaux hiérarchiques", max_level)
+        
+        # Detailed structure
+        levels = title_structure.get("levels", {})
+        if levels:
+            st.markdown("**Hiérarchie des titres :**")
+            
+            # Display each level
+            for level in sorted(levels.keys()):
+                titles = levels[level]
+                level_num = level.replace('H', '')
+                indent = "  " * (int(level_num) - 1)
+                
+                with st.expander(f"{indent}📊 {level} - {len(titles)} titre(s)", expanded=int(level_num) <= 2):
+                    for title_info in titles:
+                        confidence_color = "🟢" if title_info["confidence"] > 0.8 else "🟡" if title_info["confidence"] > 0.6 else "🟠"
+                        
+                        col1, col2, col3 = st.columns([6, 1, 1])
+                        with col1:
+                            st.write(f"{indent}• {title_info['text']}")
+                        with col2:
+                            st.write(f"Page {title_info['page']}")
+                        with col3:
+                            st.write(f"{confidence_color} {title_info['confidence']}")
+        
+        # Information message about hierarchy
+        st.info("💡 Cette structure sera utilisée pour organiser les questions générées selon la hiérarchie du document.")
+        
+        # Educational hierarchy information
+        educational_levels = []
+        for level, titles in levels.items():
+            for title_info in titles:
+                if any(keyword in title_info['text'].lower() for keyword in ['parcours', 'module', 'unité']):
+                    educational_levels.append((level, title_info['text']))
+        
+        if educational_levels:
+            st.success(f"🎓 Structure éducative détectée : {len(educational_levels)} éléments pédagogiques (Parcours/Module/Unité)")
+
+    def upload_and_process_document(self, file, config: Optional[Any] = None) -> tuple[str, str, str]:
         """Upload and process a PDF document."""
         try:
             if file is None:
@@ -135,6 +192,7 @@ class StreamlitQCMInterface:
                 doc_manager = get_document_manager()
                 document = asyncio.run(doc_manager.process_and_store_document(
                     file_path,
+                    config=config,
                     store_in_rag=True
                 ))
 
@@ -156,6 +214,9 @@ class StreamlitQCMInterface:
 
                 progress_bar.progress(1.0)
                 status_text.text("✅ Traitement terminé!")
+
+                # Display detected title structure
+                self._display_title_structure(document.doc_metadata)
 
                 # File is now permanently stored in data/pdfs/ directory
 
@@ -1007,6 +1068,8 @@ def _display_document_chunks(doc_id: int, doc: dict[str, Any]):
 
             # Chunk metadata
             st.markdown("### 📋 Métadonnées du chunk")
+            
+            
             col_meta1, col_meta2, col_meta3, col_meta4 = st.columns(4)
 
             with col_meta1:
@@ -1020,19 +1083,37 @@ def _display_document_chunks(doc_id: int, doc: dict[str, Any]):
                 reading_time = max(1, selected_chunk['word_count'] // 200)
                 st.metric("Lecture (min)", reading_time)
 
-            # Additional metadata if available
+            # Additional metadata and page information
             metadata = selected_chunk.get('metadata', {})
-            if any(metadata.values()):
-                st.markdown("**Métadonnées supplémentaires :**")
-                meta_info = []
-                if metadata.get('start_char'):
-                    meta_info.append(f"Position début: {metadata['start_char']}")
-                if metadata.get('end_char'):
-                    meta_info.append(f"Position fin: {metadata['end_char']}")
-                if metadata.get('page_number'):
-                    meta_info.append(f"Page: {metadata['page_number']}")
-                if meta_info:
-                    st.write(" | ".join(meta_info))
+            meta_info = []
+            
+            # Add standard metadata
+            if metadata.get('start_char'):
+                meta_info.append(f"Position début: {metadata['start_char']}")
+            if metadata.get('end_char'):
+                meta_info.append(f"Position fin: {metadata['end_char']}")
+            if metadata.get('page_number'):
+                meta_info.append(f"Page (metadata): {metadata['page_number']}")
+            
+            # Add page range information from chunk data
+            if selected_chunk.get('start_page'):
+                if selected_chunk.get('end_page') and selected_chunk['end_page'] != selected_chunk['start_page']:
+                    meta_info.append(f"Pages chunk: {selected_chunk['start_page']}-{selected_chunk['end_page']}")
+                else:
+                    meta_info.append(f"Page chunk: {selected_chunk['start_page']}")
+            
+            # Add page numbers list if available
+            if selected_chunk.get('page_numbers'):
+                page_list = selected_chunk['page_numbers']
+                if len(page_list) > 1:
+                    meta_info.append(f"Pages concernées: {', '.join(map(str, sorted(page_list)))}")
+                elif len(page_list) == 1:
+                    meta_info.append(f"Page concernée: {page_list[0]}")
+            
+            # Always show if we have any metadata or page info
+            if meta_info:
+                st.markdown("**Métadonnées et informations de page :**")
+                st.write(" | ".join(meta_info))
 
             # Title hierarchy information
             title_hierarchy = selected_chunk.get('title_hierarchy', {})
@@ -1076,20 +1157,37 @@ def _display_document_chunks(doc_id: int, doc: dict[str, Any]):
                     else:
                         st.markdown("**H4:** *Non défini*")
 
-            # Additional metadata if available
+            # Additional metadata and page information
             metadata = selected_chunk.get('metadata', {})
-            if any(metadata.values()):
-                st.markdown("**Métadonnées supplémentaires :**")
-                meta_info = []
-                if metadata.get('start_char'):
-                    meta_info.append(f"Position début: {metadata['start_char']}")
-                if metadata.get('end_char'):
-                    meta_info.append(f"Position fin: {metadata['end_char']}")
-                if metadata.get('page_number'):
-                    meta_info.append(f"Page: {metadata['page_number']}")
+            meta_info = []
+            
+            # Add standard metadata
+            if metadata.get('start_char'):
+                meta_info.append(f"Position début: {metadata['start_char']}")
+            if metadata.get('end_char'):
+                meta_info.append(f"Position fin: {metadata['end_char']}")
+            if metadata.get('page_number'):
+                meta_info.append(f"Page (metadata): {metadata['page_number']}")
+            
+            # Add page range information from chunk data
+            if selected_chunk.get('start_page'):
+                if selected_chunk.get('end_page') and selected_chunk['end_page'] != selected_chunk['start_page']:
+                    meta_info.append(f"Pages chunk: {selected_chunk['start_page']}-{selected_chunk['end_page']}")
+                else:
+                    meta_info.append(f"Page chunk: {selected_chunk['start_page']}")
+            
+            # Add page numbers list if available
+            if selected_chunk.get('page_numbers'):
+                page_list = selected_chunk['page_numbers']
+                if len(page_list) > 1:
+                    meta_info.append(f"Pages concernées: {', '.join(map(str, sorted(page_list)))}")
+                elif len(page_list) == 1:
+                    meta_info.append(f"Page concernée: {page_list[0]}")
 
-                if meta_info:
-                    st.write(" | ".join(meta_info))
+            # Always show if we have any metadata or page info
+            if meta_info:
+                st.markdown("**Métadonnées et informations de page :**")
+                st.write(" | ".join(meta_info))
 
             # Chunk content
             st.markdown("### 📄 Contenu du chunk")
@@ -1212,10 +1310,93 @@ def create_streamlit_interface():
                 type=['pdf'],
                 help="Uploadez un document PDF pour l'analyser et générer des questions"
             )
+            
+            # Configuration section
+            with st.expander("⚙️ Configuration du traitement", expanded=False):
+                st.subheader("📏 Paramètres des chunks")
+                chunk_size = st.slider(
+                    "Taille des chunks (caractères)", 
+                    min_value=500, max_value=3000, value=1000, step=100,
+                    help="Taille de chaque segment de texte en caractères"
+                )
+                chunk_overlap = st.slider(
+                    "Chevauchement entre chunks", 
+                    min_value=0, max_value=500, value=200, step=50,
+                    help="Nombre de caractères partagés entre chunks consécutifs"
+                )
+                
+                st.subheader("📋 Structure des titres")
+                st.markdown("**Définissez les patterns attendus pour chaque niveau de titre :**")
+                
+                # Add intelligent pattern explanation
+                st.info("""
+                🧠 **Détection Intelligente** : Donnez seulement UN exemple par type de pattern. 
+                Le système généralisera automatiquement !
+                
+                **Exemples :**
+                - `Parcours 1` → détectera `Parcours 1`, `Parcours 2`, `Parcours 15`, etc.
+                - `I.` → détectera `I.`, `II.`, `XV.`, etc.
+                - `1.` → détectera `1.`, `2.`, `25.`, etc.
+                """)
+                
+                # H1 patterns
+                h1_input = st.text_area(
+                    "H1 - Titres de niveau 1",
+                    placeholder="Parcours 1\nI.\nChapitre 1",
+                    help="⚡ UN exemple par type suffit ! Ex: 'Parcours 1' détectera tous les 'Parcours X'"
+                )
+                
+                # H2 patterns  
+                h2_input = st.text_area(
+                    "H2 - Titres de niveau 2",
+                    placeholder="Module 1\n1.\n1.1",
+                    help="⚡ UN exemple par type suffit ! Ex: 'Module 1' détectera tous les 'Module X'"
+                )
+                
+                # H3 patterns
+                h3_input = st.text_area(
+                    "H3 - Titres de niveau 3", 
+                    placeholder="Unité 1\ni.\na)",
+                    help="⚡ UN exemple par type suffit ! Ex: 'Unité 1' détectera tous les 'Unité X'"
+                )
+                
+                # H4 patterns
+                h4_input = st.text_area(
+                    "H4 - Titres de niveau 4",
+                    placeholder="a.\n1)",
+                    help="⚡ UN exemple par type suffit ! Ex: 'a.' détectera 'a.', 'b.', 'z.', etc."
+                )
+                
+                use_auto_detection = st.checkbox(
+                    "Utiliser la détection automatique en complément",
+                    value=False,
+                    help="Active la détection automatique si les patterns définis ne suffisent pas"
+                )
 
             if st.button("🚀 Traiter le document", type="primary", disabled=uploaded_file is None):
                 with st.spinner("Traitement en cours..."):
-                    status, doc_info, themes_info = interface.upload_and_process_document(uploaded_file)
+                    # Parse patterns from text areas
+                    h1_patterns = [p.strip() for p in h1_input.split('\n') if p.strip()] if h1_input else []
+                    h2_patterns = [p.strip() for p in h2_input.split('\n') if p.strip()] if h2_input else []
+                    h3_patterns = [p.strip() for p in h3_input.split('\n') if p.strip()] if h3_input else []
+                    h4_patterns = [p.strip() for p in h4_input.split('\n') if p.strip()] if h4_input else []
+                    
+                    # Create processing config
+                    from src.models.schemas import ProcessingConfig, TitleStructureConfig
+                    title_config = TitleStructureConfig(
+                        h1_patterns=h1_patterns,
+                        h2_patterns=h2_patterns, 
+                        h3_patterns=h3_patterns,
+                        h4_patterns=h4_patterns,
+                        use_auto_detection=use_auto_detection
+                    )
+                    processing_config = ProcessingConfig(
+                        chunk_size=chunk_size,
+                        chunk_overlap=chunk_overlap,
+                        title_structure=title_config
+                    )
+                    
+                    status, doc_info, themes_info = interface.upload_and_process_document(uploaded_file, processing_config)
 
                     if "✅" in status:
                         st.success(status)
