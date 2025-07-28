@@ -205,19 +205,46 @@ class TitleDetector:
                     features=features
                 )
         
-        # If we have custom config and auto_detection is disabled, only use custom patterns
-        if self.custom_config and not self.custom_config.use_auto_detection:
-            # Only proceed if we found a custom pattern match
-            if custom_score == 0:
-                return None  # No custom pattern match, skip this line
-            # For custom matches, only add minimal additional scoring
-            confidence += 0.1  # Small boost for context
-            features['pattern_score'] = 0
-            features['format_score'] = 0
-            features['context_score'] = 0
-            features['position_score'] = 0
-            features['structure_score'] = 0
-        else:
+        # Check if we should use automatic detection
+        use_auto_detection = True
+        
+        if self.custom_config:
+            # Check if we have any patterns defined
+            has_patterns = any([
+                self.custom_config.h1_patterns,
+                self.custom_config.h2_patterns, 
+                self.custom_config.h3_patterns,
+                self.custom_config.h4_patterns
+            ])
+            
+            if has_patterns and not self.custom_config.use_auto_detection:
+                # Strict custom-only mode: only proceed if we found a custom pattern match
+                if custom_score == 0:
+                    return None  # No custom pattern match, skip this line
+                # For custom matches, only add minimal additional scoring
+                confidence += 0.1  # Small boost for context
+                features['pattern_score'] = 0
+                features['format_score'] = 0
+                features['context_score'] = 0
+                features['position_score'] = 0
+                features['structure_score'] = 0
+                use_auto_detection = False
+                logger.debug(f"Custom-only mode: accepted '{line[:50]}...' with score {confidence}")
+            elif has_patterns and custom_score > 0:
+                # Custom patterns found, but auto-detection is enabled
+                # Still prioritize custom matches by skipping auto-detection for this line
+                confidence += 0.1  # Small boost for context
+                features['pattern_score'] = 0
+                features['format_score'] = 0
+                features['context_score'] = 0
+                features['position_score'] = 0
+                features['structure_score'] = 0
+                use_auto_detection = False
+                logger.debug(f"Custom priority mode: accepted '{line[:50]}...' with score {confidence}")
+            # If no custom patterns defined or no custom match, will use auto-detection
+        
+        # Apply automatic detection if needed
+        if use_auto_detection:
             # Standard analysis with automatic detection
             # Pattern matching analysis (automatic detection)
             pattern_score, pattern_level = self._analyze_patterns(line)
@@ -281,10 +308,18 @@ class TitleDetector:
             level = 2  # Module = H2
             return score, level
         
-        if re.search(r'^unité\s+\d+|^unité\s*:', line, re.IGNORECASE):
-            score += 0.9
-            level = 3  # Unité = H3
-            return score, level
+        # Enhanced pattern for "Unité" with various formats
+        unite_patterns = [
+            r'^unité\s+\d+[^\n]*$',     # "Unité 7: Titre"
+            r'^unité\s*:\s*[^\n]*$',    # "Unité: Titre" 
+            r'^\d+[\.]?\s*unité[^\n]*$', # "7. Unité Titre" or "7 Unité Titre"
+        ]
+        
+        for pattern in unite_patterns:
+            if re.search(pattern, line, re.IGNORECASE):
+                score += 0.95  # Higher confidence for Unité patterns
+                level = 3  # Unité = H3
+                return score, level
         
         # Check Roman numerals (uppercase) - typically H1 or H2 level
         roman_upper_pattern = r'^([IVXLCDM]+\.?\s+.+)$'
@@ -315,16 +350,52 @@ class TitleDetector:
             return score, level
         
         # Check lettered patterns - typically H4 level
+        # Updated to avoid matching acronyms (2+ capital letters)
         letter_patterns = [
-            (r'^([A-Z]\.?\s+.+)$', 4),  # "A. Title" -> H4
-            (r'^([a-z]\.?\s+.+)$', 4),  # "a. Title" -> H4
+            (r'^([A-Z]\.\s+.+)$', 4),         # "A. Title" -> H4 (exactly one letter + dot)
+            (r'^([A-Z]\s[a-z].+)$', 4),       # "A Title" -> H4 (one letter + space + lowercase)
+            (r'^([a-z]\.\s+.+)$', 4),         # "a. Title" -> H4
         ]
         
         for pattern, suggested_level in letter_patterns:
             if re.match(pattern, line):
-                score += 0.4
-                level = suggested_level
+                # Additional check: make sure it's not an acronym
+                first_word = line.split()[0]
+                if len(first_word) == 1 or (len(first_word) == 2 and first_word.endswith('.')):
+                    # It's a single letter or single letter with dot - valid
+                    score += 0.4
+                    level = suggested_level
+                    return score, level
+                else:
+                    # It's an acronym or multi-letter word - skip this pattern
+                    logger.debug(f"Skipped lettered pattern for acronym: '{first_word}'")
+                    continue
+        
+        # Anti-false-positive filters - Check for patterns that should NOT be titles
+        false_positive_patterns = [
+            r'^[A-Z]{2,5}\s+est\s+appliqué',      # "DDM est appliqué", "PKI est appliqué", etc.
+            r'^[A-Z]{2,5}\s+est\s+utilisé',       # "SQL est utilisé", etc.
+            r'^[A-Z]{2,5}\s+doit\s+être',         # "DDM doit être", etc.
+            r'^[A-Z]{2,5}\s+peut\s+être',         # "API peut être", etc.
+            r'Au lieu de cela',                   # Content phrases with "Au lieu de cela"
+            r'les règles de masquage',            # Specific content phrase
+            r'sont appliquées aux résultats',     # Specific content phrase
+        ]
+        
+        # Check if this line matches any false positive patterns
+        for fp_pattern in false_positive_patterns:
+            if re.search(fp_pattern, line, re.IGNORECASE):
+                # This is likely content, not a title - reduce score significantly
+                score = max(0.0, score - 0.9)
+                level = None
+                logger.debug(f"False positive filter triggered for: '{line[:50]}...' with pattern: {fp_pattern}")
                 return score, level
+        
+        # Additional content detection filters
+        if (len(line.strip()) > 100 and  # Long lines are rarely titles
+            ('.' in line[10:] or ',' in line[10:])):  # Contains punctuation mid-sentence
+            score = max(0.0, score - 0.3)  # Reduce confidence for long sentences
+            logger.debug(f"Long sentence filter applied to: '{line[:50]}...'")
         
         # Check keyword patterns with educational hierarchy
         for pattern in self.title_patterns['keywords']:
@@ -413,25 +484,61 @@ class TitleDetector:
             r'[a-z]': r'[a-z]',
         }
         
-        # Auto-detect number patterns in the input
-        # If pattern contains numbers, replace them with \d+
-        if re.search(r'\d+', pattern):
-            # Replace any sequence of digits with \d+
-            escaped_pattern = re.sub(r'\\?\d+', r'\\d+', escaped_pattern)
+        # Handle {X} placeholders first (before escaping)
+        if '{X}' in pattern:
+            # For {X}, we should use the combined pattern since it's meant to be flexible
+            # But limit each type to 20 maximum and exclude conflicts
+            number_pattern = r'(?:20|1[0-9]|[1-9])(?!\\d)'  # 1-20
+            roman_upper_pattern = r'(?:XX|XIX|XVIII|XVII|XVI|XV|XIV|XIII|XII|XI|X|IX|VIII|VII|VI|V|IV|III|II|I)(?![IVX])'  # I-XX
+            roman_lower_pattern = r'(?:xx|xix|xviii|xvii|xvi|xv|xiv|xiii|xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?![ivx])'  # i-xx
+            
+            # Letters: A-T (20 letters) - for {X} we allow all letters A-T
+            letters_upper_pattern = r'[A-T]'  # A-T (20 letters)
+            letters_lower_pattern = r'[a-t]'  # a-t (20 letters)
+            
+            replacement_pattern = f'(?:{number_pattern}|{roman_upper_pattern}|{roman_lower_pattern}|{letters_upper_pattern}|{letters_lower_pattern})'
+            escaped_pattern = re.sub(r'\\\{X\\\}', replacement_pattern, escaped_pattern)
         
-        # Auto-detect roman numeral patterns
-        if re.search(r'\b[IVX]+\b', pattern, re.IGNORECASE):
-            # Replace roman numerals with appropriate pattern
-            if re.search(r'\b[IVX]+\b', pattern):  # Uppercase
-                escaped_pattern = re.sub(r'\\?[IVX]+', r'[IVXLCDM]+', escaped_pattern)
-            elif re.search(r'\b[ivx]+\b', pattern):  # Lowercase
-                escaped_pattern = re.sub(r'\\?[ivx]+', r'[ivxlcdm]+', escaped_pattern)
-        
-        # Auto-detect single letter patterns (not roman numerals)
-        if re.search(r'\b[A-Z]\b', pattern) and not re.search(r'[IVX]', pattern):
-            escaped_pattern = re.sub(r'\\?[A-Z]', r'[A-Z]', escaped_pattern)
-        elif re.search(r'\b[a-z]\b', pattern) and not re.search(r'[ivx]', pattern):
-            escaped_pattern = re.sub(r'\\?[a-z]', r'[a-z]', escaped_pattern)
+        # Only do auto-detection if {X} placeholder was NOT used
+        # (to avoid overriding the limited patterns)
+        if '{X}' not in pattern:
+            # 1. Pattern "I." => template for roman numerals I to XX (I., II., III., ..., XX.) - CHECK FIRST!
+            if re.match(r'^[IVX]+\.$', pattern):
+                # Replace the roman numeral with the full I-XX pattern
+                roman_part = pattern.split('.')[0]  # Get "I", "V", "X", etc.
+                escaped_pattern = escaped_pattern.replace(roman_part, '(?:XX|XIX|XVIII|XVII|XVI|XV|XIV|XIII|XII|XI|X|IX|VIII|VII|VI|V|IV|III|II|I)')
+            # 2. Pattern "i." => template for roman numerals i to xx (i., ii., iii., ..., xx.)
+            elif re.match(r'^[ivx]+\.$', pattern):
+                # Replace the roman numeral with the full i-xx pattern  
+                roman_part = pattern.split('.')[0]  # Get "i", "v", "x", etc.
+                escaped_pattern = escaped_pattern.replace(roman_part, '(?:xx|xix|xviii|xvii|xvi|xv|xiv|xiii|xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)')
+            # 3. Pattern "1." => template for arabic numbers 1 to 20 (1., 2., 3., ..., 20.)
+            elif re.match(r'^\d+\.$', pattern):
+                # Replace the number with 1-20 pattern
+                number_part = re.search(r'\d+', pattern).group()  # Get "1", "2", etc.
+                escaped_pattern = escaped_pattern.replace(number_part, '(?:20|1[0-9]|[1-9])')
+            # 4. Pattern "A." => template for letters A to T (A., B., C., ..., T.) - CHECK AFTER ROMAN NUMERALS!
+            elif re.match(r'^[A-Z]\.$', pattern):
+                # Replace the specific letter (e.g., "A") with [A-T] pattern
+                letter = pattern[0]  # Get the letter (A, B, C, etc.)
+                escaped_pattern = escaped_pattern.replace(letter, '[A-T]')
+            # 5. Pattern "Parcours 1" => template for "Parcours 1" to "Parcours 20"
+            elif re.search(r'\d+', pattern):
+                # Replace any number in the pattern with 1-20 range
+                number_match = re.search(r'\d+', pattern)
+                if number_match:
+                    number_part = number_match.group()
+                    escaped_pattern = escaped_pattern.replace(number_part, '(?:20|1[0-9]|[1-9])')
+            # General roman numeral patterns (not just dots) - for backwards compatibility
+            elif re.search(r'\b[IVX]+\b', pattern):
+                escaped_pattern = re.sub(r'\\[IVX]+', r'(?:XX|XIX|XVIII|XVII|XVI|XV|XIV|XIII|XII|XI|X|IX|VIII|VII|VI|V|IV|III|II|I)(?![IVX])', escaped_pattern)
+            elif re.search(r'\b[ivx]+\b', pattern):
+                escaped_pattern = re.sub(r'\\[ivx]+', r'(?:xx|xix|xviii|xvii|xvi|xv|xiv|xiii|xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?![ivx])', escaped_pattern)
+            # Single letter patterns (not dots, not roman numerals) - for backwards compatibility
+            elif re.search(r'\b[A-Z]\b', pattern) and not re.search(r'[IVX]', pattern):
+                escaped_pattern = re.sub(r'\\[A-Z]', r'[A-T]', escaped_pattern)
+            elif re.search(r'\b[a-z]\b', pattern) and not re.search(r'[ivx]', pattern):
+                escaped_pattern = re.sub(r'\\[a-z]', r'[a-t]', escaped_pattern)
         
         # Restore escaped special characters we need
         escaped_pattern = escaped_pattern.replace(r'\\.', r'\\.')  # Periods
@@ -685,19 +792,91 @@ class TitleDetector:
                 title_page = getattr(title, 'page_number', 1)
                 
                 # Title applies if it's on or before the chunk's page range
+                # But we need better logic for proximity-based assignment
                 if title_page <= chunk_end_page:
                     level = title.level
-                    current_titles[level] = title.text
                     
-                    # When we encounter a title, clear all lower-level titles
-                    # because a new section starts
-                    for lower_level in range(level + 1, 5):
-                        current_titles[lower_level] = None
+                    # For better accuracy, prefer titles that are closer to the chunk
+                    # If we already have a title at this level, only replace it if:
+                    # 1. The new title is closer to the chunk, OR
+                    # 2. The new title is much more recent
+                    should_replace = True
+                    if current_titles[level] is not None:
+                        # Find the page of the current title
+                        current_title_page = None
+                        for existing_title in sorted_titles:
+                            if existing_title.text == current_titles[level]:
+                                current_title_page = getattr(existing_title, 'page_number', 1)
+                                break
                         
-                    logger.debug(
-                        f"Chunk pages {chunk_start_page}-{chunk_end_page}: "
-                        f"Applied H{level} '{title.text[:30]}...' from page {title_page}"
-                    )
+                        if current_title_page is not None:
+                            # Calculate distances
+                            current_distance = abs(chunk_start_page - current_title_page)
+                            new_distance = abs(chunk_start_page - title_page)
+                            
+                            # Only replace if the new title is significantly closer
+                            # or if it's much more recent (within 10 pages)
+                            if (new_distance > current_distance and 
+                                title_page - current_title_page < 10):
+                                should_replace = False
+                    
+                    if should_replace:
+                        current_titles[level] = title.text
+                        
+                        # When we encounter a title, clear all lower-level titles
+                        # because a new section starts
+                        for lower_level in range(level + 1, 5):
+                            current_titles[lower_level] = None
+                            
+                        logger.debug(
+                            f"Chunk pages {chunk_start_page}-{chunk_end_page}: "
+                            f"Applied H{level} '{title.text[:30]}...' from page {title_page}"
+                        )
+                    else:
+                        logger.debug(
+                            f"Chunk pages {chunk_start_page}-{chunk_end_page}: "
+                            f"Kept existing H{level} title, new title '{title.text[:30]}...' from page {title_page} not closer"
+                        )
+            
+            # Post-process: Check if the chunk itself contains title-like content that wasn't detected
+            # BUT only if we're not in strict custom-only mode
+            if not (self.custom_config and not self.custom_config.use_auto_detection):
+                chunk_text = chunk_data.get('chunk_text', '')
+                
+                # Look for "Unité X" patterns directly in chunk text - more aggressive approach
+                # Check for titles that start the chunk (first line with content)
+                first_lines = [line.strip() for line in chunk_text.split('\n')[:5] if line.strip()]
+                
+                for line in first_lines:
+                    # Look for Unité patterns at the beginning of chunks
+                    unite_match = re.match(r'unité\s+(\d+)[:\s]*([^\n]{0,80})', line, re.IGNORECASE)
+                    if unite_match:
+                        full_unite_title = unite_match.group(0).strip()
+                        
+                        # Always override H3 if we find a direct Unité match in the chunk
+                        # This handles cases where chunk boundaries cut titles
+                        if len(full_unite_title) < 120:  # Reasonable title length
+                            # Check if this is different from current H3 or if we should force override
+                            should_override = (
+                                not current_titles[3] or  # No H3 yet
+                                full_unite_title not in (current_titles[3] or '') or  # Different title
+                                (current_titles[3] and len(current_titles[3]) > len(full_unite_title) + 20)  # Current title too long/generic
+                            )
+                            
+                            if should_override:
+                                current_titles[3] = full_unite_title
+                                logger.debug(f"Chunk {i}: Override H3 with chunk-specific Unité title: '{full_unite_title}'")
+                            break
+                    
+                    # Look for Module patterns
+                    module_match = re.match(r'module\s+(\d+)[:\s]*([^\n]{0,100})', line, re.IGNORECASE)
+                    if module_match:
+                        full_module_title = module_match.group(0).strip()
+                        
+                        if len(full_module_title) < 150 and not current_titles[2]:
+                            current_titles[2] = full_module_title
+                            logger.debug(f"Chunk {i}: Found Module title in chunk text: '{full_module_title}'")
+                            break
             
             # Set the hierarchy
             hierarchy.h1_title = current_titles[1]

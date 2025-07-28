@@ -125,6 +125,16 @@ class DocumentManager:
                 if chunks_data:
                     # Use new chunks with page information
                     for i, chunk_data in enumerate(chunks_data):
+                        # Extract title hierarchy from chunk data
+                        title_hierarchy = chunk_data.get('title_hierarchy', {})
+                        
+                        # Prepare processing metadata with title hierarchy
+                        processing_metadata = {
+                            'title_hierarchy': title_hierarchy,
+                            'chunk_id': chunk_data.get('chunk_id', i),
+                            'page_numbers': chunk_data.get('page_numbers', [])
+                        }
+                        
                         doc_chunk = DocumentChunk(
                             document_id=document_id,
                             chunk_text=chunk_data['text'],
@@ -132,7 +142,8 @@ class DocumentManager:
                             start_page=chunk_data.get('start_page'),
                             end_page=chunk_data.get('end_page'),
                             word_count=chunk_data.get('word_count', len(chunk_data['text'].split())),
-                            char_count=chunk_data.get('char_count', len(chunk_data['text']))
+                            char_count=chunk_data.get('char_count', len(chunk_data['text'])),
+                            processing_metadata=processing_metadata
                         )
                         session.add(doc_chunk)
                 else:
@@ -332,8 +343,30 @@ class DocumentManager:
                 
                 result = []
                 for i, chunk in enumerate(chunks):
-                    # Get title hierarchy for this chunk
-                    hierarchy = title_hierarchies[i] if i < len(title_hierarchies) else None
+                    # Get title hierarchy from stored metadata first, fall back to calculated if needed
+                    stored_hierarchy = None
+                    if hasattr(chunk, 'processing_metadata') and chunk.processing_metadata:
+                        stored_hierarchy = chunk.processing_metadata.get('title_hierarchy', {})
+                    
+                    if stored_hierarchy:
+                        # Use stored title hierarchy
+                        title_hierarchy_info = {
+                            "h1_title": stored_hierarchy.get('h1_title'),
+                            "h2_title": stored_hierarchy.get('h2_title'),
+                            "h3_title": stored_hierarchy.get('h3_title'),
+                            "h4_title": stored_hierarchy.get('h4_title'),
+                            "full_path": self._build_full_path(stored_hierarchy)
+                        }
+                    else:
+                        # Fall back to calculated hierarchy
+                        hierarchy = title_hierarchies[i] if i < len(title_hierarchies) else None
+                        title_hierarchy_info = {
+                            "h1_title": hierarchy.h1_title if hierarchy else None,
+                            "h2_title": hierarchy.h2_title if hierarchy else None,
+                            "h3_title": hierarchy.h3_title if hierarchy else None,
+                            "h4_title": hierarchy.h4_title if hierarchy else None,
+                            "full_path": hierarchy.get_full_path() if hierarchy else None
+                        }
                     
                     chunk_info = {
                         "id": chunk.id,
@@ -349,13 +382,7 @@ class DocumentManager:
                             "end_char": getattr(chunk, 'end_char', None),
                             "page_number": getattr(chunk, 'page_number', None)
                         },
-                        "title_hierarchy": {
-                            "h1_title": hierarchy.h1_title if hierarchy else None,
-                            "h2_title": hierarchy.h2_title if hierarchy else None,
-                            "h3_title": hierarchy.h3_title if hierarchy else None,
-                            "h4_title": hierarchy.h4_title if hierarchy else None,
-                            "full_path": hierarchy.get_full_path() if hierarchy else None
-                        } if include_titles else None
+                        "title_hierarchy": title_hierarchy_info if include_titles else None
                     }
                     result.append(chunk_info)
                 
@@ -364,6 +391,15 @@ class DocumentManager:
         except Exception as e:
             logger.error(f"Failed to get chunks for document {document_id}: {e}")
             return []
+    
+    def _build_full_path(self, hierarchy: dict) -> str:
+        """Build full path from title hierarchy dictionary."""
+        path_parts = []
+        for level in ['h1_title', 'h2_title', 'h3_title', 'h4_title']:
+            title = hierarchy.get(level)
+            if title:
+                path_parts.append(title)
+        return " > ".join(path_parts) if path_parts else ""
     
     def get_all_themes(self) -> List[Dict[str, Any]]:
         """

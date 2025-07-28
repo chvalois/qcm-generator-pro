@@ -2123,7 +2123,7 @@ def create_streamlit_interface():
             st.subheader("🎯 Sélection des titres")
             
             # Get suggestions
-            suggestions = title_generator.get_title_suggestions(str(selected_doc_id), min_chunks=2)
+            suggestions = title_generator.get_title_suggestions(str(selected_doc_id), min_chunks=1)
             
             if suggestions:
                 st.info(f"💡 {len(suggestions)} suggestions de titres avec suffisamment de contenu:")

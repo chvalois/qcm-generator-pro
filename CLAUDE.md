@@ -7,8 +7,9 @@ This document provides comprehensive context for developing the QCM Generator Pr
 
 To Do Next
 
-- Uniformisation des questions et des réponses : ajouter few shots ?
-- Tester LangChain + Unstructured ou pyMuPDF (unstructured trop cher) pour le découpage des chunks
+- Corriger problème Module 1 et Unité 1 n'apparaissent pas dans les Titres H2 et H3
+- Espaces en trop dans les mots lorsque PDF avec polices trop larges
+- Tester LangChain + pyMuPDF (unstructured trop cher) pour le découpage des chunks + Ragas pour l'évaluation
 - Regarder du côté de : https://github.com/huridocs/pdf-document-layout-analysis
 - Redécouper Streamlit app (1200 lignes +)
 - Ajouter des exemples de questions attendues + orienter vers des questions plus "hands-on" => tester si o3 c'est mieux
@@ -17,6 +18,7 @@ To Do Next
 - Améliorer tests
 - Refactor avec Clean Archi + SOLID
 - Modifier le front avec du React ald Streamlit
+- Uniformisation des questions et des réponses : ajouter few shots ?
 
 ---
 

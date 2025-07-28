@@ -410,7 +410,7 @@ class PDFProcessor:
         # Detect title hierarchy
         title_candidates = []
         try:
-            from .title_detector import detect_document_titles
+            from .title_detector import detect_document_titles, build_chunk_title_hierarchies
             
             # Use custom title configuration if provided
             custom_config = None
@@ -419,6 +419,32 @@ class PDFProcessor:
             
             title_candidates = detect_document_titles(full_text, pages_data, custom_config)
             logger.info(f"Detected {len(title_candidates)} title candidates")
+            
+            # Build title hierarchies for chunks
+            title_hierarchies = build_chunk_title_hierarchies(
+                chunks, full_text, pages_data, custom_config, chunks_with_pages
+            )
+            
+            # Apply title hierarchies to chunks_with_pages
+            for i, chunk_data in enumerate(chunks_with_pages):
+                if i < len(title_hierarchies):
+                    hierarchy = title_hierarchies[i]
+                    chunk_data['title_hierarchy'] = {
+                        'h1_title': hierarchy.h1_title,
+                        'h2_title': hierarchy.h2_title,
+                        'h3_title': hierarchy.h3_title,
+                        'h4_title': hierarchy.h4_title,
+                    }
+                else:
+                    chunk_data['title_hierarchy'] = {
+                        'h1_title': None,
+                        'h2_title': None,
+                        'h3_title': None,
+                        'h4_title': None,
+                    }
+            
+            logger.info(f"Applied title hierarchies to {len(chunks_with_pages)} chunks")
+            
         except Exception as e:
             logger.warning(f"Title detection failed: {e}")
         
