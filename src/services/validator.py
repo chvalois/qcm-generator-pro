@@ -64,9 +64,9 @@ class QuestionValidator:
             score -= 0.4
         else:
             # Check option count based on question type
-            if question.question_type == QuestionType.MULTIPLE_CHOICE:
+            if question.question_type in [QuestionType.UNIQUE_CHOICE, QuestionType.MULTIPLE_CHOICE]:
                 if len(question.options) < 3:
-                    errors.append("Multiple choice questions should have at least 3 options")
+                    errors.append("Unique choice questions should have at least 3 options")
                     score -= 0.2
                 elif len(question.options) > 5:
                     warnings.append(f"Many options ({len(question.options)}) - consider reducing")
@@ -119,9 +119,9 @@ class QuestionValidator:
                     score -= 0.1
                     
             # Check answer count based on question type
-            if question.question_type == QuestionType.MULTIPLE_CHOICE:
+            if question.question_type in [QuestionType.UNIQUE_CHOICE, QuestionType.MULTIPLE_CHOICE]:
                 if len(correct_indices) != 1:
-                    errors.append("Multiple choice questions must have exactly 1 correct answer")
+                    errors.append("Unique choice questions must have exactly 1 correct answer")
                     score -= 0.3
             elif question.question_type == QuestionType.MULTIPLE_SELECTION:
                 if len(correct_indices) < 2:

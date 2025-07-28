@@ -25,8 +25,10 @@ class FrenchTemplate(LanguageTemplate):
     
     def get_question_type_descriptions(self) -> Dict[QuestionType, str]:
         return {
-            QuestionType.MULTIPLE_CHOICE: "choix multiple (une seule bonne réponse)",
-            QuestionType.MULTIPLE_SELECTION: "sélection multiple (plusieurs bonnes réponses possibles)"
+            QuestionType.UNIQUE_CHOICE: "choix unique (une seule bonne réponse)",
+            QuestionType.MULTIPLE_SELECTION: "sélection multiple (plusieurs bonnes réponses possibles)",
+            # Legacy support
+            QuestionType.MULTIPLE_CHOICE: "choix unique (une seule bonne réponse)"
         }
     
     def get_difficulty_descriptions(self) -> Dict[Difficulty, str]:
@@ -76,6 +78,14 @@ EXIGENCES:
 - Options de réponse plausibles
 - Explication détaillée de la réponse
 
+RÈGLES DE FORMATAGE IMPÉRATIVES:
+- NE JAMAIS ajouter de guillemets supplémentaires autour du texte de la question
+- Le texte de la question doit être direct, sans guillemets internes
+- Éviter les apostrophes et guillemets dans le texte de la question
+- Utiliser des formulations directes et claires
+- OBLIGATOIRE: Chaque option doit commencer par A., B., C., D. suivi d'un espace
+- Format exact des options: "A. Contenu de la réponse", "B. Contenu de la réponse", etc.
+
 RÉPONDEZ UNIQUEMENT au format JSON suivant:
 {{
   "question_text": "Texte de la question",
@@ -84,14 +94,46 @@ RÉPONDEZ UNIQUEMENT au format JSON suivant:
   "language": "fr",
   "theme": "{context.topic}",
   "options": [
-    "Option 1",
-    "Option 2", 
-    "Option 3",
-    "Option 4"
+    "A. Première option de réponse",
+    "B. Deuxième option de réponse", 
+    "C. Troisième option de réponse",
+    "D. Quatrième option de réponse"
   ],
   "correct_answers": [0, 2],
   "explanation": "Explication détaillée de pourquoi ces réponses sont correctes"
-}}"""
+}}
+
+IMPORTANT - COHÉRENCE ABSOLUE REQUISE:
+1. FORMAT DES EXPLICATIONS:
+   - Dans l'explication, référencez TOUJOURS les options par leurs lettres: A, B, C, D
+   - La première option (index 0) = Option A
+   - La deuxième option (index 1) = Option B  
+   - La troisième option (index 2) = Option C
+   - La quatrième option (index 3) = Option D
+   - N'utilisez JAMAIS les indices numériques (0, 1, 2, 3) dans l'explication
+
+2. COHÉRENCE RÉPONSES/EXPLICATION:
+   - L'explication DOIT être parfaitement cohérente avec les correct_answers
+   - Si correct_answers contient [0, 2], l'explication DOIT dire "A et C sont correctes"
+   - Si correct_answers contient [1], l'explication DOIT dire "B est correcte"
+   - Mentionnez explicitement POURQUOI chaque option correcte est bonne
+   - Mentionnez explicitement POURQUOI chaque option incorrecte est mauvaise
+   - VÉRIFIEZ deux fois que votre explication correspond aux indices correct_answers
+
+3. STRUCTURE OBLIGATOIRE DE L'EXPLICATION:
+   - Commencez par: "La/Les réponse(s) correcte(s) est/sont [lettres] car..."
+   - Expliquez pourquoi chaque réponse correcte est valide
+   - Puis: "Les options [lettres] sont incorrectes car..."
+   - Expliquez pourquoi chaque réponse incorrecte est invalide
+
+4. EXEMPLE DE COHÉRENCE:
+   Si correct_answers: [1, 3] (options B et D):
+   ✅ CORRECT: "Les réponses correctes sont B et D car... Les options A et C sont incorrectes car..."
+   ❌ INTERDIT: "Les réponses A et C sont correctes..." (incohérent avec correct_answers)
+   
+   Si correct_answers: [0] (option A uniquement):
+   ✅ CORRECT: "La réponse correcte est A car... Les options B, C et D sont incorrectes car..."
+   ❌ INTERDIT: "A et B sont correctes..." (incohérent avec correct_answers)"""
 
         return prompt
     
@@ -175,4 +217,12 @@ INSTRUCTIONS GÉNÉRALES:
 - Assure-toi que les questions sont éducatives et utiles
 - Évite les pièges ou les ambiguïtés inutiles
 - Utilise un vocabulaire approprié au niveau demandé
-- Fournis des explications pédagogiques complètes"""
+- Fournis des explications pédagogiques complètes
+- N'utilise JAMAIS de guillemets supplémentaires dans le texte des questions
+- Formule les questions de manière directe sans apostrophes ou guillemets
+
+RÈGLE CRITIQUE - COHÉRENCE:
+- L'explication DOIT être parfaitement cohérente avec les correct_answers
+- Vérifie systématiquement que ton explication mentionne les bonnes lettres
+- Une incohérence entre correct_answers et explication est INACCEPTABLE
+- Relis ton JSON avant de le finaliser pour vérifier la cohérence"""

@@ -25,8 +25,10 @@ class EnglishTemplate(LanguageTemplate):
     
     def get_question_type_descriptions(self) -> Dict[QuestionType, str]:
         return {
-            QuestionType.MULTIPLE_CHOICE: "multiple choice (single correct answer)",
-            QuestionType.MULTIPLE_SELECTION: "multiple selection (multiple correct answers possible)"
+            QuestionType.UNIQUE_CHOICE: "unique choice (single correct answer)",
+            QuestionType.MULTIPLE_SELECTION: "multiple selection (multiple correct answers possible)",
+            # Legacy support
+            QuestionType.MULTIPLE_CHOICE: "unique choice (single correct answer)"
         }
     
     def get_difficulty_descriptions(self) -> Dict[Difficulty, str]:
@@ -71,6 +73,14 @@ REQUIREMENTS:
 - Plausible answer options
 - Detailed explanation
 
+MANDATORY FORMATTING RULES:
+- NEVER add extra quotes around the question text
+- Question text should be direct, without internal quotes
+- Avoid apostrophes and quotes in the question text
+- Use direct and clear formulations
+- MANDATORY: Each option must start with A., B., C., D. followed by a space
+- Exact format for options: "A. Answer content", "B. Answer content", etc.
+
 RESPOND ONLY in the following JSON format:
 {{
   "question_text": "Question text",
@@ -79,14 +89,46 @@ RESPOND ONLY in the following JSON format:
   "language": "en",
   "theme": "{context.topic}",
   "options": [
-    "Option 1",
-    "Option 2", 
-    "Option 3",
-    "Option 4"
+    "A. First answer option",
+    "B. Second answer option", 
+    "C. Third answer option",
+    "D. Fourth answer option"
   ],
   "correct_answers": [0, 2],
   "explanation": "Detailed explanation of why these answers are correct"
-}}"""
+}}
+
+IMPORTANT - ABSOLUTE CONSISTENCY REQUIRED:
+1. EXPLANATION FORMAT:
+   - In the explanation, ALWAYS reference options by their letters: A, B, C, D
+   - First option (index 0) = Option A
+   - Second option (index 1) = Option B  
+   - Third option (index 2) = Option C
+   - Fourth option (index 3) = Option D
+   - NEVER use numeric indices (0, 1, 2, 3) in the explanation
+
+2. ANSWER/EXPLANATION CONSISTENCY:
+   - The explanation MUST be perfectly consistent with correct_answers
+   - If correct_answers contains [0, 2], explanation MUST say "A and C are correct"
+   - If correct_answers contains [1], explanation MUST say "B is correct"
+   - Explicitly mention WHY each correct option is good
+   - Explicitly mention WHY each incorrect option is wrong
+   - DOUBLE-CHECK that your explanation matches the correct_answers indices
+
+3. MANDATORY EXPLANATION STRUCTURE:
+   - Start with: "The correct answer(s) is/are [letters] because..."
+   - Explain why each correct answer is valid
+   - Then: "Options [letters] are incorrect because..."
+   - Explain why each incorrect answer is invalid
+
+4. CONSISTENCY EXAMPLE:
+   If correct_answers: [1, 3] (options B and D):
+   ✅ CORRECT: "The correct answers are B and D because... Options A and C are incorrect because..."
+   ❌ FORBIDDEN: "The correct answers are A and C..." (inconsistent with correct_answers)
+   
+   If correct_answers: [0] (option A only):
+   ✅ CORRECT: "The correct answer is A because... Options B, C and D are incorrect because..."
+   ❌ FORBIDDEN: "A and B are correct..." (inconsistent with correct_answers)"""
 
         return prompt
     
@@ -170,4 +212,12 @@ GENERAL INSTRUCTIONS:
 - Ensure questions are educational and useful
 - Avoid unnecessary traps or ambiguities
 - Use vocabulary appropriate to the requested level
-- Provide complete pedagogical explanations"""
+- Provide complete pedagogical explanations
+- NEVER use extra quotes in question text
+- Formulate questions directly without apostrophes or quotes
+
+CRITICAL RULE - CONSISTENCY:
+- The explanation MUST be perfectly consistent with correct_answers
+- Systematically check that your explanation mentions the right letters
+- An inconsistency between correct_answers and explanation is UNACCEPTABLE
+- Reread your JSON before finalizing to verify consistency"""

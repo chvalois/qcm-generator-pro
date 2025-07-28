@@ -15,6 +15,7 @@ from ..models.schemas import GenerationConfig, QuestionCreate
 from .document_manager import get_document_manager
 from .qcm_generator import QCMGenerator
 from .rag_engine import get_rag_engine
+from .progress_tracker import update_progress, increment_progress
 
 logger = logging.getLogger(__name__)
 
@@ -192,7 +193,8 @@ class TitleBasedQCMGenerator:
         self,
         criteria: TitleSelectionCriteria,
         config: GenerationConfig,
-        session_id: Optional[str] = None
+        session_id: Optional[str] = None,
+        progress_session_id: Optional[str] = None
     ) -> List[QuestionCreate]:
         """
         Generate QCM questions from chunks matching the title criteria.
@@ -201,6 +203,7 @@ class TitleBasedQCMGenerator:
             criteria: Title selection criteria
             config: Generation configuration
             session_id: Optional session ID
+            progress_session_id: Optional progress tracking session ID
             
         Returns:
             List of generated questions
@@ -246,6 +249,13 @@ class TitleBasedQCMGenerator:
             questions = []
             for i in range(config.num_questions):
                 try:
+                    # Update progress if tracking session exists
+                    if progress_session_id:
+                        update_progress(
+                            progress_session_id,
+                            current_step=f"Génération question {i+1}/{config.num_questions} depuis: {topic}"
+                        )
+                    
                     question = await self.qcm_generator.generate_single_question(
                         topic=topic,
                         config=config,
@@ -259,6 +269,13 @@ class TitleBasedQCMGenerator:
                         question.generation_params['chunk_count'] = len(matching_chunks)
                     
                     questions.append(question)
+                    
+                    # Increment progress after successful generation
+                    if progress_session_id:
+                        increment_progress(
+                            progress_session_id,
+                            current_step=f"Question générée depuis: {topic}"
+                        )
                     
                 except Exception as e:
                     logger.warning(f"Failed to generate question {i+1} for title '{topic}': {e}")

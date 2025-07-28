@@ -34,6 +34,79 @@ class QuestionParser:
     MAX_PROMPT_LENGTH = 1000
     REQUIRED_FIELDS = ["question_text", "question_type", "options", "correct_answers", "explanation"]
     
+    @staticmethod
+    def _clean_quotes(text: str) -> str:
+        """
+        Remove unwanted quotes and apostrophes from text fields.
+        
+        Args:
+            text: Input text that may contain extra quotes
+            
+        Returns:
+            Cleaned text without extra quotes
+        """
+        if not isinstance(text, str):
+            return text
+            
+        # Remove leading and trailing quotes of various types
+        text = text.strip()
+        
+        # Remove double quotes at beginning and end
+        if text.startswith('"') and text.endswith('"') and len(text) > 2:
+            text = text[1:-1]
+        
+        # Remove single quotes at beginning and end    
+        if text.startswith("'") and text.endswith("'") and len(text) > 2:
+            text = text[1:-1]
+            
+        # Remove French quotes
+        if text.startswith("«") and text.endswith("»"):
+            text = text[1:-1].strip()
+            
+        # Clean up internal double quotes that might cause CSV issues
+        # Replace any remaining double quotes with single quotes for CSV compatibility
+        text = text.replace('"', "'")
+        
+        return text.strip()
+    
+    @staticmethod
+    def _normalize_options(options: list) -> list:
+        """
+        Normalize options to ensure they start with A., B., C., D. format.
+        
+        Args:
+            options: List of option strings
+            
+        Returns:
+            List of normalized options with A., B., C., D. prefixes
+        """
+        if not isinstance(options, list):
+            return options
+            
+        normalized = []
+        letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']  # Support up to 8 options
+        
+        for i, option in enumerate(options):
+            if not isinstance(option, str):
+                normalized.append(option)
+                continue
+                
+            option = option.strip()
+            
+            # Check if option already starts with correct format (A., B., etc.)
+            expected_prefix = f"{letters[i]}."
+            if option.startswith(expected_prefix):
+                # Already correctly formatted
+                normalized.append(option)
+            elif len(option) >= 2 and option[0].upper() in letters and option[1] == '.':
+                # Has some letter format, but wrong letter - replace with correct one
+                normalized.append(f"{expected_prefix} {option[2:].lstrip()}")
+            else:
+                # No letter format - add the correct prefix
+                normalized.append(f"{expected_prefix} {option}")
+        
+        return normalized
+    
     def parse_llm_response(
         self,
         response: Any,
@@ -71,13 +144,13 @@ class QuestionParser:
             # Validate required fields
             self._validate_required_fields(question_data)
             
-            # Parse and validate options
-            options = self._parse_options(question_data)
+            # Parse and validate options (may update question type)
+            options, updated_question_type = self._parse_options(question_data)
             
             # Get enum values safely
             language = self._parse_language(question_data, config)
             difficulty = self._parse_difficulty(question_data)
-            question_type = self._parse_question_type(question_data)
+            question_type = self._parse_question_type(question_data)  # Uses updated question_data
             
             # Process source chunks
             processed_chunks = self._process_source_chunks(source_chunks)
@@ -272,6 +345,13 @@ class QuestionParser:
         if missing_fields:
             raise QuestionParsingError(f"Missing required fields: {missing_fields}")
         
+        # Clean text fields before validation
+        question_data["question_text"] = self._clean_quotes(question_data.get("question_text", ""))
+        question_data["explanation"] = self._clean_quotes(question_data.get("explanation", ""))
+        # Clean options text (normalization is done later in _parse_options)
+        if isinstance(question_data.get("options"), list):
+            question_data["options"] = [self._clean_quotes(opt) for opt in question_data["options"]]
+        
         # Additional validation for field types and contents
         if not isinstance(question_data.get("question_text", ""), str) or not question_data["question_text"].strip():
             raise QuestionParsingError("question_text must be a non-empty string")
@@ -295,47 +375,80 @@ class QuestionParser:
         
         logger.debug("All required fields validated successfully")
     
-    def _parse_options(self, question_data: Dict[str, Any]) -> List[QuestionOption]:
-        """Parse options from question data."""
+    def _parse_options(self, question_data: Dict[str, Any]) -> tuple[List[QuestionOption], str]:
+        """
+        Parse options from question data and potentially adjust question type.
+        
+        Returns:
+            Tuple of (options_list, potentially_updated_question_type)
+        """
         option_texts = question_data["options"]
         correct_indices = question_data["correct_answers"]
         
         # Validate and adjust correct answers based on question type
         question_type = question_data.get("question_type", "multiple-choice")
-        correct_indices = self._validate_correct_answers(correct_indices, question_type, len(option_texts))
+        correct_indices, updated_question_type = self._validate_correct_answers(correct_indices, question_type, len(option_texts))
+        
+        # Update question_data with the potentially new question type
+        question_data["question_type"] = updated_question_type
+        
+        # Normalize option texts before creating QuestionOption objects
+        normalized_option_texts = self._normalize_options(option_texts)
         
         # Create QuestionOption objects
         options = []
-        for i, option_text in enumerate(option_texts):
+        for i, option_text in enumerate(normalized_option_texts):
             is_correct = i in correct_indices
             options.append(QuestionOption(
                 text=option_text,
                 is_correct=is_correct
             ))
         
-        return options
+        return options, updated_question_type
     
     def _validate_correct_answers(
         self, 
         correct_indices: List[int], 
         question_type: str, 
         options_count: int
-    ) -> List[int]:
-        """Validate and fix correct answers based on question type."""
-        if question_type == "multiple-choice":
-            if len(correct_indices) != 1:
-                logger.warning(f"Multiple choice question has {len(correct_indices)} correct answers, fixing to 1")
-                return [correct_indices[0]] if correct_indices else [0]
-        elif question_type == "multiple-selection":
-            if len(correct_indices) < 2:
-                logger.warning(f"Multiple selection question has {len(correct_indices)} correct answers, fixing to 2")
-                if len(correct_indices) == 0:
-                    return [0, 1]
-                elif len(correct_indices) == 1:
-                    next_index = (correct_indices[0] + 1) % options_count
-                    return [correct_indices[0], next_index]
+    ) -> tuple[List[int], str]:
+        """
+        Validate and intelligently adjust question type based on correct answers.
         
-        return correct_indices
+        Returns:
+            Tuple of (corrected_indices, potentially_updated_question_type)
+        """
+        original_type = question_type
+        
+        if question_type in ["multiple-choice", "unique-choice"]:
+            if len(correct_indices) > 1:
+                # LLM found multiple correct answers - convert to multiple-selection
+                logger.info(f"Converting {question_type} to multiple-selection: found {len(correct_indices)} correct answers")
+                return correct_indices, "multiple-selection"
+            elif len(correct_indices) == 0:
+                # No correct answers - default to first option
+                logger.warning("No correct answers found, defaulting to first option")
+                return [0], "unique-choice"  # Normalize to new format
+        
+        elif question_type == "multiple-selection":
+            if len(correct_indices) == 1:
+                # LLM found only one correct answer - convert to unique-choice
+                logger.info(f"Converting multiple-selection to unique-choice: only {len(correct_indices)} correct answer")
+                return correct_indices, "unique-choice"
+            elif len(correct_indices) == 0:
+                # No correct answers - create a reasonable multiple-selection
+                logger.warning("No correct answers found for multiple-selection, defaulting to first two options")
+                return [0, 1], question_type
+            elif len(correct_indices) >= options_count:
+                # All options are correct - not meaningful for multiple-selection
+                logger.warning(f"All {len(correct_indices)} options marked correct, reducing to first two")
+                return [0, 1], question_type
+        
+        # Default case - return as-is
+        if original_type != question_type:
+            logger.info(f"Question type adapted from {original_type} to {question_type}")
+        
+        return correct_indices, question_type
     
     def _parse_language(self, question_data: Dict[str, Any], config: GenerationConfig) -> Language:
         """Parse language from question data or config."""
@@ -512,12 +625,12 @@ class QuestionParser:
         try:
             return QuestionCreate(
                 # Required fields from QuestionBase
-                question_text=question_data["question_text"],
+                question_text=question_data["question_text"],  # Already cleaned
                 question_type=question_type,
                 language=language,
                 difficulty=difficulty,
-                options=options,
-                explanation=self._update_explanation_indices(question_data["explanation"]),
+                options=options,  # QuestionOption objects with normalized text
+                explanation=self._update_explanation_indices(question_data["explanation"]),  # Already cleaned
                 
                 # Required fields from QuestionCreate
                 document_id=document_id,
@@ -536,12 +649,12 @@ class QuestionParser:
             if "source_chunks" in str(e) and source_chunks:
                 logger.warning(f"Source chunks validation failed, retrying without them: {e}")
                 return QuestionCreate(
-                    question_text=question_data["question_text"],
+                    question_text=question_data["question_text"],  # Already cleaned
                     question_type=question_type,
                     language=language,
                     difficulty=difficulty,
-                    options=options,
-                    explanation=self._update_explanation_indices(question_data["explanation"]),
+                    options=options,  # QuestionOption objects with normalized text
+                    explanation=self._update_explanation_indices(question_data["explanation"]),  # Already cleaned
                     document_id=document_id,
                     session_id=session_id,
                     generation_order=0,

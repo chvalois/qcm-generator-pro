@@ -5,6 +5,10 @@ This module provides a user-friendly web interface using Streamlit
 for the QCM generation system with all features integrated.
 """
 
+# Suppress deprecation warnings before other imports
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 import json
 import logging
 import tempfile
@@ -32,6 +36,8 @@ from src.services.document_manager import (
 from src.services.llm_manager import generate_llm_response_sync, test_llm_connection
 from src.services.pdf_processor import process_pdf, validate_pdf_file
 from src.services.qcm_generator import generate_progressive_qcm
+from src.ui.progress_components import ProgressDisplay, create_progress_placeholder, update_progress_placeholder
+from src.services.progress_tracker import get_progress_state
 from src.services.rag_engine import (
     add_document_to_rag,
     get_question_context,
@@ -467,24 +473,96 @@ class StreamlitQCMInterface:
                 st.write(f"Génération de {batch_size} questions supplémentaires...")
 
                 if st.button(f"🚀 Générer {batch_size} questions"):
-                    with st.spinner("Génération en cours..."):
-                        # Generate batch of questions
-                        import asyncio
+                    # Create progress display elements
+                    progress_container = st.empty()
+                    progress_bar = st.progress(0.0, text="Initialisation...")
+                    status_text = st.empty()
+                    
+                    # Initialize progress tracking
+                    import asyncio
+                    import uuid
+                    import time
+                    import threading
 
-                        from src.services.qcm_generator import QCMGenerator
+                    from src.services.qcm_generator import QCMGenerator
+                    from src.services.progress_tracker import start_progress_session, get_progress_state
 
-                        generator = QCMGenerator()
-                        questions = asyncio.run(generator.generate_questions_batch(
-                            topics=topics,
-                            config=config,
-                            document_ids=list(st.session_state.processed_documents.keys()),
-                            batch_size=batch_size,
-                            session_id=session_id
-                        ))
+                    progress_session_id = f"phase2_{uuid.uuid4().hex[:8]}"
+                    start_progress_session(
+                        session_id=progress_session_id,
+                        total_questions=batch_size,
+                        initial_step=f"Génération de {batch_size} questions - Phase 2"
+                    )
 
+                    # Variables for thread communication
+                    questions_result = [None]
+                    generation_complete = [False]
+                    generation_error = [None]
+
+                    # Function to run generation in background
+                    def run_generation():
+                        try:
+                            generator = QCMGenerator()
+                            result = asyncio.run(generator.generate_questions_batch(
+                                topics=topics,
+                                config=config,
+                                document_ids=list(st.session_state.processed_documents.keys()),
+                                batch_size=batch_size,
+                                session_id=session_id,
+                                progress_session_id=progress_session_id
+                            ))
+                            questions_result[0] = result
+                        except Exception as e:
+                            generation_error[0] = str(e)
+                        finally:
+                            generation_complete[0] = True
+
+                    # Start generation in background thread
+                    thread = threading.Thread(target=run_generation)
+                    thread.start()
+
+                    # Real-time progress updates
+                    while not generation_complete[0]:
+                        # Get current progress state
+                        current_state = get_progress_state(progress_session_id)
+                        
+                        if current_state:
+                            # Update progress bar
+                            progress_value = current_state.progress_percentage / 100.0
+                            progress_bar.progress(
+                                progress_value, 
+                                text=f"{current_state.current_step} ({current_state.processed_questions}/{current_state.total_questions})"
+                            )
+                            
+                            # Update status
+                            if current_state.processed_questions > 0:
+                                status_text.info(f"📊 Progression: {current_state.progress_percentage:.1f}% - {current_state.current_step}")
+                        
+                        # Small delay to avoid overwhelming the UI
+                        time.sleep(0.5)
+
+                    # Wait for thread to complete
+                    thread.join()
+
+                    # Handle results
+                    if generation_error[0]:
+                        st.error(f"❌ Erreur lors de la génération: {generation_error[0]}")
+                        return "🔍 Phase 2 - Erreur", "", ""
+                    
+                    questions = questions_result[0]
+                    if questions:
+                        # Final progress update
+                        progress_bar.progress(1.0, text=f"✅ {len(questions)} questions générées!")
+                        status_text.success(f"Génération terminée: {len(questions)} questions")
+                        
+                        time.sleep(1)  # Brief pause to show completion
+                        
                         session["questions_so_far"].extend(questions)
                         session["status"] = "phase_2_review"
                         st.rerun()
+                    else:
+                        st.error("❌ Aucune question générée")
+                        return "🔍 Phase 2 - Erreur", "", ""
 
                 # Return status for phase 2 ready (waiting for user action)
                 return "🔍 Phase 2 - En attente", "", ""
@@ -540,24 +618,100 @@ class StreamlitQCMInterface:
                 st.write(f"Génération des {remaining} questions restantes...")
 
                 if st.button(f"🚀 Générer les {remaining} questions restantes"):
-                    with st.spinner("Génération finale..."):
-                        # Generate remaining questions
+                    # Show progress
+                    progress_container = st.empty()
+                    
+                    with progress_container.container():
+                        st.info("🔄 Génération finale en cours...")
+                        progress_bar = st.progress(0.0, text="Initialisation...")
+                        status_text = st.empty()
+                        
+                        # Start progress tracking
                         import asyncio
+                        import uuid
+                        import time
+                        import threading
 
                         from src.services.qcm_generator import QCMGenerator
+                        from src.services.progress_tracker import start_progress_session, get_progress_state
 
-                        generator = QCMGenerator()
-                        questions = asyncio.run(generator.generate_questions_batch(
-                            topics=topics,
-                            config=config,
-                            document_ids=list(st.session_state.processed_documents.keys()),
-                            batch_size=remaining,
-                            session_id=session_id
-                        ))
+                        progress_session_id = f"phase3_{uuid.uuid4().hex[:8]}"
+                        start_progress_session(
+                            session_id=progress_session_id,
+                            total_questions=remaining,
+                            initial_step=f"Génération finale - {remaining} questions restantes"
+                        )
 
-                        session["questions_so_far"].extend(questions)
-                        session["status"] = "completed"
-                        st.rerun()
+                        # Variables for thread communication
+                        questions_result = [None]
+                        generation_complete = [False]
+                        generation_error = [None]
+
+                        # Function to run generation in background
+                        def run_generation():
+                            try:
+                                generator = QCMGenerator()
+                                result = asyncio.run(generator.generate_questions_batch(
+                                    topics=topics,
+                                    config=config,
+                                    document_ids=list(st.session_state.processed_documents.keys()),
+                                    batch_size=remaining,
+                                    session_id=session_id,
+                                    progress_session_id=progress_session_id
+                                ))
+                                questions_result[0] = result
+                            except Exception as e:
+                                generation_error[0] = str(e)
+                            finally:
+                                generation_complete[0] = True
+
+                        # Start generation in background thread
+                        thread = threading.Thread(target=run_generation)
+                        thread.start()
+
+                        # Real-time progress updates
+                        while not generation_complete[0]:
+                            # Get current progress state
+                            current_state = get_progress_state(progress_session_id)
+                            
+                            if current_state:
+                                # Update progress bar
+                                progress_value = current_state.progress_percentage / 100.0
+                                progress_bar.progress(
+                                    progress_value, 
+                                    text=f"{current_state.current_step} ({current_state.processed_questions}/{current_state.total_questions})"
+                                )
+                                
+                                # Update status
+                                if current_state.processed_questions > 0:
+                                    status_text.info(f"📊 Progression: {current_state.progress_percentage:.1f}% - {current_state.current_step}")
+                            
+                            # Small delay to avoid overwhelming the UI
+                            time.sleep(0.5)
+
+                        # Wait for thread to complete
+                        thread.join()
+
+                        # Handle results
+                        if generation_error[0]:
+                            st.error(f"❌ Erreur lors de la génération: {generation_error[0]}")
+                            return "🔍 Phase 3 - Erreur", "", ""
+                        
+                        questions = questions_result[0]
+                        if questions:
+                            # Final progress update
+                            progress_bar.progress(1.0, text=f"✅ {len(questions)} questions générées!")
+                            status_text.success(f"Génération terminée: {len(questions)} questions")
+                        else:
+                            st.error("❌ Aucune question générée")
+                            return "🔍 Phase 3 - Erreur", "", ""
+                        
+                        time.sleep(1)  # Brief pause to show completion
+
+                    session["questions_so_far"].extend(questions)
+                    session["status"] = "completed"
+                    progress_container.empty()  # Clear progress display
+                    st.rerun()
 
                 # Return status for phase 3 ready (waiting for user action)
                 return "🔍 Phase 3 - En attente", "", ""
@@ -2157,10 +2311,30 @@ def create_streamlit_interface():
                 
                 # Generate button
                 if st.button("🚀 Générer questions depuis titre", type="primary"):
-                    with st.spinner("🔄 Génération en cours..."):
+                    # Show progress
+                    progress_container = st.empty()
+                    
+                    with progress_container.container():
+                        st.info("🔄 Génération depuis titre en cours...")
+                        progress_bar = st.progress(0.0, text="Initialisation...")
+                        status_text = st.empty()
+                        
                         try:
+                            import asyncio
+                            import uuid
+                            import time
+                            import threading
                             from src.models.schemas import GenerationConfig
                             from src.models.enums import Language, Difficulty, QuestionType
+                            from src.services.progress_tracker import start_progress_session, get_progress_state
+                            
+                            # Start progress tracking
+                            progress_session_id = f"title_{uuid.uuid4().hex[:8]}"
+                            start_progress_session(
+                                session_id=progress_session_id,
+                                total_questions=num_questions_title,
+                                initial_step=f"Génération par titre: {criteria.get_title_path()}"
+                            )
                             
                             # Create configuration
                             if difficulty_title == "mixed":
@@ -2187,11 +2361,78 @@ def create_streamlit_interface():
                                 question_types=type_dist
                             )
                             
-                            # Generate questions
-                            import asyncio
-                            questions = asyncio.run(title_generator.generate_questions_from_title(
-                                criteria, config, f"title_session_{abs(hash(criteria.get_title_path())) % 10000}"
-                            ))
+                            # Variables for thread communication
+                            questions_result = [None]
+                            generation_complete = [False]
+                            generation_error = [None]
+
+                            # Function to run generation in background
+                            def run_title_generation():
+                                try:
+                                    session_id_param = f"title_session_{abs(hash(criteria.get_title_path())) % 10000}"
+                                    
+                                    # Generate questions with progress tracking
+                                    try:
+                                        # Try with progress tracking if supported
+                                        result = asyncio.run(title_generator.generate_questions_from_title(
+                                            criteria, config, session_id_param, progress_session_id=progress_session_id
+                                        ))
+                                    except TypeError:
+                                        # Fallback without progress tracking
+                                        result = asyncio.run(title_generator.generate_questions_from_title(
+                                            criteria, config, session_id_param
+                                        ))
+                                    
+                                    questions_result[0] = result
+                                except Exception as e:
+                                    generation_error[0] = str(e)
+                                finally:
+                                    generation_complete[0] = True
+
+                            # Start generation in background thread
+                            thread = threading.Thread(target=run_title_generation)
+                            thread.start()
+
+                            # Real-time progress updates
+                            while not generation_complete[0]:
+                                # Get current progress state
+                                current_state = get_progress_state(progress_session_id)
+                                
+                                if current_state:
+                                    # Update progress bar
+                                    progress_value = current_state.progress_percentage / 100.0
+                                    progress_bar.progress(
+                                        progress_value, 
+                                        text=f"{current_state.current_step} ({current_state.processed_questions}/{current_state.total_questions})"
+                                    )
+                                    
+                                    # Update status
+                                    if current_state.processed_questions > 0:
+                                        status_text.info(f"📊 Progression: {current_state.progress_percentage:.1f}% - {current_state.current_step}")
+                                
+                                # Small delay to avoid overwhelming the UI
+                                time.sleep(0.5)
+
+                            # Wait for thread to complete
+                            thread.join()
+
+                            # Handle results
+                            if generation_error[0]:
+                                st.error(f"❌ Erreur lors de la génération: {generation_error[0]}")
+                                progress_container.empty()
+                                return
+                            
+                            questions = questions_result[0]
+                            if questions:
+                                # Final progress update
+                                progress_bar.progress(1.0, text=f"✅ {len(questions)} questions générées depuis titre!")
+                                status_text.success(f"Génération terminée: {len(questions)} questions")
+                            else:
+                                st.error("❌ Aucune question générée")
+                                progress_container.empty()
+                                return
+                            
+                            time.sleep(1)  # Brief pause to show completion
                             
                             if questions:
                                 # Store in session state
@@ -2222,8 +2463,18 @@ def create_streamlit_interface():
                                 st.error("❌ Aucune question générée. Vérifiez la sélection et réessayez.")
                         
                         except Exception as e:
+                            # Fail progress session on error
+                            from src.services.progress_tracker import fail_progress_session
+                            fail_progress_session(
+                                progress_session_id,
+                                error_message=str(e),
+                                error_step="Erreur lors de la génération par titre"
+                            )
                             st.error(f"❌ Erreur lors de la génération: {str(e)}")
                             logger.error(f"Title-based generation failed: {e}")
+                    
+                    # Clear progress display after completion or error
+                    progress_container.empty()
             else:
                 st.info("👆 Sélectionnez au moins un niveau de titre pour continuer")
         

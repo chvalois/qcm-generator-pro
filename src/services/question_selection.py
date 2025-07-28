@@ -49,9 +49,9 @@ class QuestionSelector:
                     logger.debug(f"Selected question type: {enum_type.value}")
                     return enum_type
                 
-        # Fallback to multiple choice
-        logger.debug("Using fallback question type: multiple-choice")
-        return QuestionType.MULTIPLE_CHOICE
+        # Fallback to unique choice
+        logger.debug("Using fallback question type: unique-choice")
+        return QuestionType.UNIQUE_CHOICE
     
     def select_difficulty(self, config: GenerationConfig) -> Difficulty:
         """
