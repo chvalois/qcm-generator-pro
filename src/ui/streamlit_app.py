@@ -2272,7 +2272,7 @@ def create_streamlit_interface():
                     # Calculate word count for recommendation
                     total_words = sum(chunk.get('word_count', len(chunk.get('chunk_text', '').split())) 
                                     for chunk in matching_chunks)
-                    recommended_questions = max(1, min(total_words // 100, max_questions))
+                    recommended_questions = max(1, min(total_words // 150, max_questions))
                     
                     # Display recommendation info
                     st.info(f"📊 **Niveau sélectionné:** {title_level or 'Multiple'} | "

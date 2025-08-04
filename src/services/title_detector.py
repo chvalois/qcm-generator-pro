@@ -774,6 +774,12 @@ class TitleDetector:
         )
         
         logger.info(f"Processing {len(chunks_with_pages)} chunks with page info")
+        
+        # DEBUG: Afficher les détails complets des titres pour diagnostiquer
+        logger.info("=== DEBUG TITLE ATTRIBUTION ===")
+        for title in sorted_titles:
+            logger.info(f"Title: '{title.text[:50]}...' | Level: {title.level} | Page: {getattr(title, 'page_number', 'MISSING')}")
+        logger.info("=== END DEBUG ===")
         logger.info(f"Available titles: {[(t.text[:30], t.level, getattr(t, 'page_number', '?')) for t in sorted_titles]}")
         
         for i, chunk_data in enumerate(chunks_with_pages):
@@ -783,7 +789,11 @@ class TitleDetector:
             chunk_start_page = chunk_data.get('start_page', 1)
             chunk_end_page = chunk_data.get('end_page', chunk_start_page)
             
-            logger.debug(f"Chunk {i}: pages {chunk_start_page}-{chunk_end_page}, text: {chunk_data.get('text', '')[:50]}...")
+            logger.info(f"DEBUG Chunk {i}: pages {chunk_start_page}-{chunk_end_page}, text: {chunk_data.get('text', '')[:50]}...")
+            
+            # DEBUG: Afficher tous les titres candidats pour ce chunk
+            applicable_titles = [t for t in sorted_titles if getattr(t, 'page_number', 1) <= chunk_end_page]
+            logger.info(f"  -> Applicable titles for chunk {i}: {[(t.text[:30], t.level, getattr(t, 'page_number', '?')) for t in applicable_titles]}")
             
             # Find applicable titles for this chunk's page range
             current_titles = {1: None, 2: None, 3: None, 4: None}
@@ -792,14 +802,14 @@ class TitleDetector:
                 title_page = getattr(title, 'page_number', 1)
                 
                 # Title applies if it's on or before the chunk's page range
-                # But we need better logic for proximity-based assignment
+                # BUT: We need to prevent later titles from overriding earlier ones inappropriately
                 if title_page <= chunk_end_page:
                     level = title.level
                     
                     # For better accuracy, prefer titles that are closer to the chunk
                     # If we already have a title at this level, only replace it if:
-                    # 1. The new title is closer to the chunk, OR
-                    # 2. The new title is much more recent
+                    # 1. The new title is closer to the chunk start, OR
+                    # 2. The new title is within the chunk range (more specific)
                     should_replace = True
                     if current_titles[level] is not None:
                         # Find the page of the current title
@@ -810,32 +820,69 @@ class TitleDetector:
                                 break
                         
                         if current_title_page is not None:
-                            # Calculate distances
+                            # Calculate distances from chunk START (not end)
                             current_distance = abs(chunk_start_page - current_title_page)
                             new_distance = abs(chunk_start_page - title_page)
                             
-                            # Only replace if the new title is significantly closer
-                            # or if it's much more recent (within 10 pages)
-                            if (new_distance > current_distance and 
-                                title_page - current_title_page < 10):
+                            # FIXED LOGIC: Only replace if the new title is closer to chunk START
+                            # AND either:
+                            # - The new title is within the chunk range, OR  
+                            # - The new title is significantly closer (at least 2 pages)
+                            if new_distance < current_distance:
+                                # New title is closer to chunk start
+                                if (chunk_start_page <= title_page <= chunk_end_page or  # Title within chunk
+                                    current_distance - new_distance >= 2):  # Significantly closer
+                                    should_replace = True
+                                else:
+                                    should_replace = False
+                            else:
+                                # New title is farther or same distance - don't replace
                                 should_replace = False
                     
                     if should_replace:
                         current_titles[level] = title.text
                         
-                        # When we encounter a title, clear all lower-level titles
-                        # because a new section starts
+                        # FIXED: Only clear lower-level titles if this title comes from a LATER page
+                        # If titles are on the same page, they likely form a proper hierarchy
+                        should_clear_lower_levels = False
+                        
+                        # Check if any existing lower-level titles are from earlier pages
                         for lower_level in range(level + 1, 5):
-                            current_titles[lower_level] = None
+                            if current_titles[lower_level] is not None:
+                                # Find the page of the existing lower-level title
+                                existing_title_page = None
+                                for existing_title in sorted_titles:
+                                    if existing_title.text == current_titles[lower_level]:
+                                        existing_title_page = getattr(existing_title, 'page_number', 1)
+                                        break
+                                
+                                # Only clear if the current title is from a later page
+                                if existing_title_page is not None and title_page > existing_title_page:
+                                    should_clear_lower_levels = True
+                                    break
+                        
+                        # Clear lower-level titles only if they're from earlier pages
+                        if should_clear_lower_levels:
+                            for lower_level in range(level + 1, 5):
+                                if current_titles[lower_level] is not None:
+                                    # Check if this lower-level title is from an earlier page
+                                    existing_title_page = None
+                                    for existing_title in sorted_titles:
+                                        if existing_title.text == current_titles[lower_level]:
+                                            existing_title_page = getattr(existing_title, 'page_number', 1)
+                                            break
+                                    
+                                    if existing_title_page is not None and title_page > existing_title_page:
+                                        current_titles[lower_level] = None
                             
-                        logger.debug(
+                        logger.info(
                             f"Chunk pages {chunk_start_page}-{chunk_end_page}: "
                             f"Applied H{level} '{title.text[:30]}...' from page {title_page}"
                         )
                     else:
-                        logger.debug(
+                        logger.info(
                             f"Chunk pages {chunk_start_page}-{chunk_end_page}: "
-                            f"Kept existing H{level} title, new title '{title.text[:30]}...' from page {title_page} not closer"
+                            f"Applied H{level} '{title.text[:30]}...' from page {title_page}"
                         )
             
             # Post-process: Check if the chunk itself contains title-like content that wasn't detected
@@ -874,6 +921,7 @@ class TitleDetector:
                         full_module_title = module_match.group(0).strip()
                         
                         if len(full_module_title) < 150 and not current_titles[2]:
+                            logger.info(f"Chunk {i}: POST-PROCESS applying Module from chunk text: '{full_module_title}'")
                             current_titles[2] = full_module_title
                             logger.debug(f"Chunk {i}: Found Module title in chunk text: '{full_module_title}'")
                             break
@@ -884,7 +932,11 @@ class TitleDetector:
             hierarchy.h3_title = current_titles[3]
             hierarchy.h4_title = current_titles[4]
             
-            logger.debug(f"Chunk {i} final hierarchy: H1={current_titles[1]}, H2={current_titles[2]}, H3={current_titles[3]}, H4={current_titles[4]}")
+            # DEBUG: Log si H2 est None mais il devrait y avoir Module 1
+            if current_titles[2] is None and i == 0:
+                logger.error(f"*** BUG CHUNK 0: H2 is None! Final current_titles: {current_titles}")
+            
+            logger.info(f"Chunk {i} final hierarchy: H1={current_titles[1]}, H2={current_titles[2]}, H3={current_titles[3]}, H4={current_titles[4]}")
             
             chunk_hierarchies.append(hierarchy)
             
