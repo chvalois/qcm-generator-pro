@@ -1,0 +1,217 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'src/**/*.py'
+      - 'tests/**/*.py'
+      - 'scripts/**/*.py'
+      - '*.py'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'docker-compose*.yml'
+      - 'Dockerfile'
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    name: Claude Code Review
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v42
+        with:
+          files: |
+            src/**/*.py
+            tests/**/*.py
+            scripts/**/*.py
+            *.py
+            pyproject.toml
+            requirements*.txt
+            docker-compose*.yml
+            Dockerfile
+            
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Install dependencies for analysis
+        run: |
+          pip install --upgrade pip
+          pip install ruff mypy pylint bandit safety
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          
+      - name: Run static analysis
+        id: static-analysis
+        run: |
+          echo "## Static Analysis Results" >> analysis_results.md
+          echo "" >> analysis_results.md
+          
+          # Ruff linting
+          echo "### 🔍 Ruff Linting" >> analysis_results.md
+          if ruff check . --format=github >> ruff_output.txt 2>&1; then
+            echo "✅ No linting issues found" >> analysis_results.md
+          else
+            echo "⚠️ Linting issues found:" >> analysis_results.md
+            echo '```' >> analysis_results.md
+            cat ruff_output.txt >> analysis_results.md
+            echo '```' >> analysis_results.md
+          fi
+          echo "" >> analysis_results.md
+          
+          # MyPy type checking
+          echo "### 🏷️ Type Checking (MyPy)" >> analysis_results.md
+          if mypy src/ --ignore-missing-imports >> mypy_output.txt 2>&1; then
+            echo "✅ No type checking issues found" >> analysis_results.md
+          else
+            echo "⚠️ Type checking issues found:" >> analysis_results.md
+            echo '```' >> analysis_results.md
+            cat mypy_output.txt >> analysis_results.md
+            echo '```' >> analysis_results.md
+          fi
+          echo "" >> analysis_results.md
+          
+          # Security check with Bandit
+          echo "### 🔒 Security Analysis (Bandit)" >> analysis_results.md
+          if bandit -r src/ -f txt >> bandit_output.txt 2>&1; then
+            echo "✅ No security issues found" >> analysis_results.md
+          else
+            echo "⚠️ Security issues found:" >> analysis_results.md
+            echo '```' >> analysis_results.md
+            cat bandit_output.txt >> analysis_results.md
+            echo '```' >> analysis_results.md
+          fi
+          
+      - name: Generate file summaries
+        id: file-summaries
+        run: |
+          echo "## Changed Files Summary" >> file_summaries.md
+          echo "" >> file_summaries.md
+          
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            if [[ -f "$file" ]]; then
+              echo "### 📄 $file" >> file_summaries.md
+              echo "" >> file_summaries.md
+              
+              # Count lines
+              lines=$(wc -l < "$file")
+              echo "**Lines:** $lines" >> file_summaries.md
+              
+              # Get file type info
+              if [[ "$file" == *.py ]]; then
+                # Count functions and classes
+                functions=$(grep -c "^def " "$file" || echo "0")
+                classes=$(grep -c "^class " "$file" || echo "0")
+                echo "**Functions:** $functions | **Classes:** $classes" >> file_summaries.md
+                
+                # Extract docstrings/comments
+                if grep -q '"""' "$file"; then
+                  echo "**Has docstrings:** ✅" >> file_summaries.md
+                else
+                  echo "**Has docstrings:** ❌" >> file_summaries.md
+                fi
+              fi
+              
+              echo "" >> file_summaries.md
+            fi
+          done
+          
+      - name: Create review context
+        id: review-context
+        run: |
+          echo "## Review Context" > review_context.md
+          echo "" >> review_context.md
+          echo "**Branch:** ${{ github.head_ref }}" >> review_context.md
+          echo "**Base:** ${{ github.base_ref }}" >> review_context.md
+          echo "**Author:** ${{ github.actor }}" >> review_context.md
+          echo "**PR Title:** ${{ github.event.pull_request.title }}" >> review_context.md
+          echo "" >> review_context.md
+          echo "### PR Description" >> review_context.md
+          echo "${{ github.event.pull_request.body }}" >> review_context.md
+          echo "" >> review_context.md
+          
+          # Combine all analysis
+          cat review_context.md analysis_results.md file_summaries.md > complete_analysis.md
+          
+      - name: Comment PR with analysis
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Read the analysis results
+            let analysisContent = '';
+            try {
+              analysisContent = fs.readFileSync('complete_analysis.md', 'utf8');
+            } catch (error) {
+              analysisContent = '❌ Could not read analysis results';
+            }
+            
+            // Create the comment
+            const comment = `
+            # 🤖 Claude Code Review Assistant
+            
+            This is an automated pre-review analysis. A human reviewer should still conduct a thorough review.
+            
+            ${analysisContent}
+            
+            ---
+            
+            ## 📋 Review Checklist for Human Reviewers
+            
+            Please verify:
+            
+            ### Architecture & Design
+            - [ ] Follows SOLID principles
+            - [ ] Proper separation of concerns
+            - [ ] Clean Architecture patterns
+            - [ ] Appropriate abstraction levels
+            
+            ### Code Quality
+            - [ ] Proper error handling
+            - [ ] Adequate logging
+            - [ ] No code duplication
+            - [ ] Security best practices
+            
+            ### QCM Generator Specific
+            - [ ] LLM integration patterns
+            - [ ] PDF processing efficiency
+            - [ ] Question generation quality
+            - [ ] Multi-language support
+            
+            ### Testing
+            - [ ] Adequate test coverage
+            - [ ] Proper test structure
+            - [ ] Edge cases covered
+            
+            **Next Steps:** 
+            1. Address any critical issues from static analysis
+            2. Conduct manual code review focusing on architecture
+            3. Test the changes in Docker environment
+            4. Verify LLM integration still works correctly
+            `;
+            
+            // Post the comment
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+            
+      - name: Set review status
+        run: |
+          if grep -q "⚠️" analysis_results.md; then
+            echo "::warning::Static analysis found issues that should be addressed"
+            exit 1
+          else
+            echo "::notice::Static analysis passed successfully"
+          fi
