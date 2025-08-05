@@ -6,6 +6,7 @@ metadata parsing, and document chunking for QCM generation.
 """
 
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List

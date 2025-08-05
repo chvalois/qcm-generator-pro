@@ -897,22 +897,165 @@ class StreamlitQCMInterface:
     def test_llm_connection(self) -> str:
         """Test LLM connectivity."""
         try:
-            from src.services.llm_manager import test_llm_connection_sync
+            from src.services.llm_manager import test_llm_connection_sync, get_current_llm_config, download_ollama_model_sync
 
+            # Get current configuration
+            current_config = get_current_llm_config()
+            current_provider = current_config["provider"]
+            current_model = current_config["model"]
+
+            # Test all connections
             results = test_llm_connection_sync()
+            
+            # Cache results for download buttons
+            st.session_state.last_connection_test = results
 
-            status_info = "🔗 **État des connexions LLM:**\n\n"
+            status_info = f"🎯 **LLM ACTUEL**: {current_provider.upper()} - {current_model}\n"
+            status_info += f"📊 **Statut**: {'🟢 ACTIF' if current_provider in results and results[current_provider].get('status') == 'success' else '🔴 INACTIF'}\n\n"
+            status_info += "🔗 **Tests de connexion des providers:**\n\n"
+            
             for provider, result in results.items():
-                if result.get("status") == "success":
-                    status_info += f"✅ **{provider.upper()}**: Connecté\n"
-                    status_info += f"   Modèle: {result.get('model', 'N/A')}\n\n"
+                # Mark current provider with emphasis
+                if provider == current_provider:
+                    status_prefix = "🟢 **[ACTUEL]**"
+                    model_to_show = current_model
                 else:
-                    status_info += f"❌ **{provider.upper()}**: {result.get('error', 'Erreur')}\n\n"
+                    status_prefix = "⚪"
+                    model_to_show = result.get('model', 'N/A')
+                
+                config_info = result.get('config', {})
+                indent = '      ' if provider != current_provider else '   '
+                
+                if result.get("status") == "success":
+                    status_info += f"{status_prefix} **{provider.upper()}**: ✅ Connecté\n"
+                    status_info += f"{indent} └─ Modèle testé: {model_to_show}\n"
+                    if config_info.get('api_key_prefix'):
+                        status_info += f"{indent} └─ Clé API: {config_info['api_key_prefix']} ({config_info.get('api_key_length', 0)} car.)\n"
+                else:
+                    status_info += f"{status_prefix} **{provider.upper()}**: ❌ Erreur\n"
+                    error_msg = result.get('error', 'Erreur')
+                    status_info += f"{indent} └─ {error_msg}\n"
+                    
+                    # Special handling for Ollama model not found errors
+                    if provider == "ollama" and "not available in Ollama" in error_msg:
+                        # Extract model name from error message
+                        import re
+                        model_match = re.search(r'Model (\S+) not available', error_msg)
+                        if model_match:
+                            missing_model = model_match.group(1)
+                            status_info += f"{indent} └─ 💡 **Solution**: Télécharger le modèle manquant\n"
+                            
+                            # Create download button using session state
+                            download_key = f"download_{missing_model}_{provider}"
+                            if download_key not in st.session_state:
+                                st.session_state[download_key] = False
+                                
+                            # Show download option in the status
+                            status_info += f"{indent} └─ 🔽 **Modèle à télécharger**: `{missing_model}`\n"
+                    
+                    # Show configuration issues
+                    if not config_info.get('configured', True):
+                        for issue in config_info.get('issues', []):
+                            status_info += f"{indent} └─ ⚠️ {issue}\n"
+                            
+                status_info += "\n"
 
             return status_info
 
         except Exception as e:
             return f"❌ Erreur de test: {str(e)}"
+    
+    def show_ollama_model_downloads(self):
+        """Show download buttons for missing Ollama models."""
+        try:
+            from src.services.llm_manager import test_llm_connection_sync, download_ollama_model_sync
+            
+            # Get test results to check for missing models (use cached if available)
+            if 'last_connection_test' in st.session_state:
+                results = st.session_state.last_connection_test
+            else:
+                results = test_llm_connection_sync()
+                st.session_state.last_connection_test = results
+            
+            for provider, result in results.items():
+                if provider == "ollama" and result.get("status") == "error":
+                    error_msg = result.get('error', '')
+                    
+                    # Check if it's a model not available error
+                    if "not available in Ollama" in error_msg:
+                        import re
+                        model_match = re.search(r'Model (\S+) not available', error_msg)
+                        if model_match:
+                            missing_model = model_match.group(1)
+                            available_models = re.search(r'Available models: (.+)', error_msg)
+                            available_list = available_models.group(1) if available_models else "aucun"
+                            
+                            st.markdown("---")
+                            st.markdown("### 🔽 Téléchargement de modèles Ollama")
+                            
+                            col1, col2 = st.columns([2, 1])
+                            
+                            with col1:
+                                st.markdown(f"**Modèle manquant**: `{missing_model}`")
+                                st.markdown(f"**Modèles disponibles**: {available_list}")
+                                st.markdown("💡 **Solution**: Téléchargez le modèle manquant ci-dessous")
+                            
+                            with col2:
+                                download_key = f"download_btn_{missing_model}"
+                                
+                                if st.button(f"📥 Télécharger {missing_model}", key=download_key):
+                                    st.write(f"🚀 **Début du téléchargement de {missing_model}**")
+                                    
+                                    # Create a progress container
+                                    progress_container = st.empty()
+                                    status_container = st.empty()
+                                    
+                                    try:
+                                        with progress_container:
+                                            with st.spinner(f"Téléchargement de {missing_model} en cours..."):
+                                                status_container.info("⏳ Cette opération peut prendre plusieurs minutes selon la taille du modèle")
+                                                
+                                                # Log the attempt
+                                                st.write(f"🔍 **Debug**: Appel de download_ollama_model_sync('{missing_model}')")
+                                                
+                                                download_result = download_ollama_model_sync(missing_model)
+                                                
+                                                st.write(f"🔍 **Debug**: Résultat = {download_result}")
+                                        
+                                        # Clear the progress container
+                                        progress_container.empty()
+                                        
+                                        if download_result.get("status") == "success":
+                                            status_container.success(f"✅ {download_result.get('message', 'Téléchargement réussi')}")
+                                            st.info("🔄 Re-testez les connexions pour vérifier que le modèle fonctionne")
+                                            # Force refresh of the page state
+                                            st.rerun()
+                                        else:
+                                            status_container.error(f"❌ Échec du téléchargement: {download_result.get('error', 'Erreur inconnue')}")
+                                            
+                                    except Exception as e:
+                                        progress_container.empty()
+                                        status_container.error(f"❌ Exception durant le téléchargement: {str(e)}")
+                                        st.write(f"🔍 **Debug**: Exception details = {repr(e)}")
+                                            
+                            # Show additional popular models to download
+                            st.markdown("### 📦 Autres modèles populaires")
+                            popular_models = ["llama3:8b", "mistral:7b", "qwen3:14b", "phi3:mini"]
+                            
+                            cols = st.columns(len(popular_models))
+                            for i, model in enumerate(popular_models):
+                                with cols[i]:
+                                    if st.button(f"📥 {model}", key=f"popular_{model}"):
+                                        with st.spinner(f"Téléchargement de {model}..."):
+                                            download_result = download_ollama_model_sync(model)
+                                            if download_result.get("status") == "success":
+                                                st.success(f"✅ {model} téléchargé")
+                                                st.rerun()
+                                            else:
+                                                st.error(f"❌ Erreur: {download_result.get('error')}")
+                            
+        except Exception as e:
+            st.error(f"❌ Erreur d'affichage des téléchargements: {str(e)}")
 
     def initialize_progressive_generation(
         self,
@@ -1634,6 +1777,7 @@ def create_streamlit_interface():
                     with st.spinner("Migration en cours..."):
                         # This would run the migration script
                         st.info("💡 Exécuter: `python scripts/migrate_to_chromadb.py migrate`")
+
 
         with col2:
             st.subheader("📄 Documents stockés")
@@ -2507,10 +2651,15 @@ def create_streamlit_interface():
                             # Function to run generation in background
                             def run_title_generation():
                                 try:
+                                    import logging
+                                    logger = logging.getLogger(__name__)
+                                    logger.info(f"Starting title generation for: {criteria.get_title_path()}")
+                                    
                                     session_id_param = f"title_session_{abs(hash(criteria.get_title_path())) % 10000}"
                                     
                                     # Generate questions with progress tracking
                                     try:
+                                        logger.info("Attempting title generation with progress tracking")
                                         # Try with progress tracking if supported
                                         result = asyncio.run(title_generator.generate_questions_from_title(
                                             criteria, config, session_id_param, 
@@ -2518,26 +2667,35 @@ def create_streamlit_interface():
                                             examples_file=selected_examples_file_title if use_examples_title else None,
                                             max_examples=max_examples_title if use_examples_title else 3
                                         ))
-                                    except TypeError:
+                                        logger.info("Title generation with progress tracking successful")
+                                    except TypeError as te:
+                                        logger.warning(f"Progress tracking not supported, falling back: {te}")
                                         # Fallback without progress tracking
                                         result = asyncio.run(title_generator.generate_questions_from_title(
                                             criteria, config, session_id_param,
                                             examples_file=selected_examples_file_title if use_examples_title else None,
                                             max_examples=max_examples_title if use_examples_title else 3
                                         ))
+                                        logger.info("Title generation without progress tracking successful")
                                     
                                     questions_result[0] = result
+                                    logger.info(f"Title generation completed with {len(result) if result else 0} questions")
                                 except Exception as e:
+                                    logger.error(f"Title generation failed: {e}")
                                     generation_error[0] = str(e)
                                 finally:
                                     generation_complete[0] = True
+                                    logger.info("Title generation thread completed")
 
                             # Start generation in background thread
                             thread = threading.Thread(target=run_title_generation)
                             thread.start()
 
-                            # Real-time progress updates
-                            while not generation_complete[0]:
+                            # Real-time progress updates with timeout
+                            timeout_counter = 0
+                            max_timeout = 300  # 5 minutes timeout (300 * 0.5 seconds)
+                            
+                            while not generation_complete[0] and timeout_counter < max_timeout:
                                 # Get current progress state
                                 current_state = get_progress_state(progress_session_id)
                                 
@@ -2552,9 +2710,20 @@ def create_streamlit_interface():
                                     # Update status
                                     if current_state.processed_questions > 0:
                                         status_text.info(f"📊 Progression: {current_state.progress_percentage:.1f}% - {current_state.current_step}")
+                                else:
+                                    # Show basic progress when no detailed state available
+                                    progress_bar.progress(0.5, text="⏳ Génération en cours...")
+                                    status_text.info("🔄 Génération en cours, veuillez patienter...")
                                 
                                 # Small delay to avoid overwhelming the UI
                                 time.sleep(0.5)
+                                timeout_counter += 1
+                            
+                            # Check for timeout
+                            if timeout_counter >= max_timeout:
+                                st.error("⏱️ Timeout: La génération a pris trop de temps (5 minutes). Veuillez réessayer.")
+                                progress_container.empty()
+                                return
 
                             # Wait for thread to complete
                             thread.join()
@@ -2682,17 +2851,102 @@ def create_streamlit_interface():
     elif tab_choice == "⚙️ Système":
         st.header("🔧 État du système")
 
+        # LLM Configuration Section
+        st.subheader("🤖 Configuration LLM")
+        
+        try:
+            from src.services.llm_manager import get_current_llm_config, switch_llm_provider
+            from src.models.enums import ModelType
+            
+            # Check for session override first
+            if hasattr(st.session_state, 'llm_provider') and hasattr(st.session_state, 'llm_model'):
+                # Only apply if different from current to avoid repeated calls
+                current_config = get_current_llm_config()
+                if (current_config["provider"] != st.session_state.llm_provider or 
+                    current_config["model"] != st.session_state.llm_model):
+                    provider_enum = ModelType(st.session_state.llm_provider)
+                    switch_llm_provider(provider_enum, st.session_state.llm_model)
+            
+            # Get current configuration
+            llm_config = get_current_llm_config()
+            current_provider = llm_config["provider"]
+            current_model = llm_config["model"]
+            available_models = llm_config["available_models"]
+            
+            col_llm1, col_llm2 = st.columns(2)
+            
+            with col_llm1:
+                # Show current LLM configuration
+                st.info(f"**LLM actuel:** {current_provider.upper()} - {current_model}")
+                
+                # Provider selection
+                provider_options = ["openai", "anthropic", "ollama"]
+                current_provider_idx = provider_options.index(current_provider) if current_provider in provider_options else 0
+                
+                new_provider = st.selectbox(
+                    "Fournisseur LLM:",
+                    provider_options,
+                    index=current_provider_idx,
+                    help="OpenAI: GPT models, Anthropic: Claude models, Ollama: Local models"
+                )
+                
+                # Model selection based on provider
+                if new_provider in available_models:
+                    available_provider_models = available_models[new_provider]
+                    try:
+                        current_model_idx = available_provider_models.index(current_model) if current_model in available_provider_models else 0
+                    except ValueError:
+                        current_model_idx = 0
+                        
+                    new_model = st.selectbox(
+                        f"Modèle {new_provider.upper()}:",
+                        available_provider_models,
+                        index=current_model_idx,
+                        help=f"Modèles disponibles pour {new_provider}"
+                    )
+                else:
+                    new_model = current_model
+                    st.warning(f"Aucun modèle disponible pour {new_provider}")
+                
+                # Switch button
+                if st.button("🔄 Changer de modèle LLM"):
+                    with st.spinner("Changement en cours..."):
+                        try:
+                            provider_enum = ModelType(new_provider)
+                            success = switch_llm_provider(provider_enum, new_model)
+                            if success:
+                                # Also store in session for persistence
+                                st.session_state.llm_provider = new_provider
+                                st.session_state.llm_model = new_model
+                                st.success(f"✅ LLM changé vers {new_provider.upper()} - {new_model}")
+                                st.rerun()
+                            else:
+                                st.error("❌ Échec du changement de LLM")
+                        except Exception as e:
+                            st.error(f"❌ Erreur: {str(e)}")
+            
+            with col_llm2:
+                if st.button("🔗 Tester connexions LLM"):
+                    with st.spinner("Test des connexions..."):
+                        llm_status = interface.test_llm_connection()
+                        st.markdown(llm_status) 
+                        
+                        # Set flag to show download buttons
+                        st.session_state.show_download_buttons = True
+                        
+            # Show download buttons outside the button click context (persistent)
+            if st.session_state.get('show_download_buttons', False):
+                interface.show_ollama_model_downloads()
+                        
+        except Exception as e:
+            st.error(f"❌ Erreur configuration LLM: {str(e)}")
+
+        # System Stats
+        st.subheader("📊 Statistiques de session")
         col1, col2 = st.columns(2)
-
         with col1:
-            if st.button("🔗 Tester connexions LLM"):
-                with st.spinner("Test des connexions..."):
-                    llm_status = interface.test_llm_connection()
-                    st.markdown(llm_status)
-
-        with col2:
-            st.subheader("📊 Statistiques de session")
             st.metric("Documents traités", len(st.session_state.processed_documents))
+        with col2:
             st.metric("Questions générées", len(st.session_state.generated_questions))
 
         # System information

@@ -75,10 +75,13 @@ async def detailed_health_check(
         }
         health_status["status"] = "degraded"
         
-    # LLM services health
+    # LLM services health (only test current provider to reduce noise)
     try:
         llm_manager = get_llm_manager()
-        llm_health = await llm_manager.test_connection()
+        current_provider = llm_manager.model_type.value
+        
+        # Only test the current provider to avoid spam in LangSmith
+        llm_health = await llm_manager.test_connection(provider=current_provider)
         
         working_providers = [
             provider for provider, result in llm_health.items()
@@ -88,6 +91,7 @@ async def detailed_health_check(
         health_status["checks"]["llm"] = {
             "status": "healthy" if working_providers else "unhealthy",
             "working_providers": working_providers,
+            "current_provider": current_provider,
             "details": llm_health
         }
         

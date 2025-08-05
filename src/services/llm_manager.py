@@ -91,7 +91,7 @@ class LLMManager:
             LLMError: If API call fails
         """
         if not settings.llm.openai_api_key:
-            raise LLMError("OpenAI API key not configured")
+            raise LLMError("OpenAI API key not configured (LLM_OPENAI_API_KEY environment variable)")
             
         model = model or settings.llm.openai_model
         temperature = temperature or settings.llm.default_temperature
@@ -245,8 +245,27 @@ class LLMManager:
             raise LLMError("Ollama base URL not configured")
             
         model = model or self.default_model
+        
+        # Check if model is available
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                models_response = await client.get(f"{settings.llm.ollama_base_url}/api/tags")
+                if models_response.status_code == 200:
+                    available_models = [m["name"] for m in models_response.json().get("models", [])]
+                    if model not in available_models:
+                        logger.warning(f"Model {model} not found in Ollama. Available: {available_models}")
+                        raise LLMError(f"Model {model} not available in Ollama. Available models: {', '.join(available_models)}")
+        except httpx.RequestError as e:
+            logger.warning(f"Could not check Ollama models: {e}")
+            # Continue anyway - maybe the model is available
+            
         temperature = temperature or settings.llm.default_temperature
         max_tokens = max_tokens or settings.llm.default_max_tokens
+        
+        # Increase timeout for large models
+        timeout = settings.llm.ollama_timeout
+        if model and ("70b" in model.lower() or "72b" in model.lower()):
+            timeout = min(timeout * 3, 600)  # 3x timeout for large models, max 10 minutes
         
         # Format prompt with system message if provided
         full_prompt = prompt
@@ -264,7 +283,8 @@ class LLMManager:
         }
         
         try:
-            async with httpx.AsyncClient(timeout=settings.llm.ollama_timeout) as client:
+            logger.info(f"Calling Ollama API with model: {model}, timeout: {timeout}s")
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(
                     f"{settings.llm.ollama_base_url}/api/generate",
                     json=payload
@@ -272,6 +292,7 @@ class LLMManager:
                 response.raise_for_status()
                 
             result = response.json()
+            logger.debug(f"Ollama API response received for model: {model}")
             
             return LLMResponse(
                 content=result["response"],
@@ -298,7 +319,10 @@ class LLMManager:
             logger.error(f"Unexpected Ollama API response format: {e}")
             raise LLMError(f"Invalid Ollama API response: {e}")
             
-    @traceable(name="llm_generate_response", run_type="llm")
+    @traceable(
+        name="llm_generate_response", 
+        run_type="llm"
+    )
     async def generate_response(
         self, 
         prompt: str,
@@ -342,6 +366,27 @@ class LLMManager:
         response = None
         used_provider = None
         used_model = model or self.default_model
+        
+        # Set up LangSmith tracking metadata before making the call
+        try:
+            from langsmith import get_current_run_tree
+            current_run = get_current_run_tree()
+            if current_run:
+                # Set up initial metadata 
+                current_run.extra = current_run.extra or {}
+                current_run.extra.update({
+                    "topic": topic,
+                    "question_type": question_type,
+                    "difficulty": difficulty,
+                    "examples_file": examples_file,
+                    "max_examples": max_examples,
+                    "uses_fewshot": examples_file is not None
+                })
+                
+        except ImportError:
+            pass  # LangSmith not available
+        except Exception as e:
+            logger.debug(f"Failed to update initial LangSmith metadata: {e}")
         
         try:
             # Determine provider
@@ -389,6 +434,53 @@ class LLMManager:
             generation_time = time.time() - start_time
             logger.info(f"LLM call successful - {used_provider}/{used_model} - {generation_time:.2f}s")
             
+            # Update LangSmith trace with final provider/model info using standard LLM run fields
+            try:
+                from langsmith import get_current_run_tree
+                current_run = get_current_run_tree()
+                if current_run:
+                    # Update run with LLM-specific properties that LangSmith recognizes
+                    # These are the standard fields for LLM runs in LangSmith
+                    if hasattr(current_run, 'inputs'):
+                        current_run.inputs = current_run.inputs or {}
+                        current_run.inputs.update({
+                            "model": used_model,
+                            "provider": used_provider,
+                            "temperature": temperature or settings.llm.default_temperature,
+                            "max_tokens": max_tokens or settings.llm.default_max_tokens,
+                        })
+                    
+                    # Set the standard LangSmith LLM run properties
+                    current_run.extra = current_run.extra or {}
+                    current_run.extra.update({
+                        "model": used_model,
+                        "provider": used_provider,
+                        "generation_time_seconds": generation_time,
+                        "invocation_params": {
+                            "model": used_model,
+                            "temperature": temperature or settings.llm.default_temperature,
+                            "max_tokens": max_tokens or settings.llm.default_max_tokens,
+                        }
+                    })
+                    
+                    # Update the run name to include provider/model for clarity
+                    if used_provider and used_model:
+                        current_run.name = f"llm_generate_response [{used_provider}/{used_model}]"
+                        
+                    # Try to set the run serialized property for model/provider (LangSmith specific)
+                    try:
+                        if hasattr(current_run, 'serialized'):
+                            current_run.serialized = current_run.serialized or {}
+                            current_run.serialized.update({
+                                "provider": used_provider,
+                                "model": used_model
+                            })
+                    except Exception:
+                        pass  # Not all versions support this
+                        
+            except Exception as e:
+                logger.debug(f"Failed to update final LangSmith metadata: {e}")
+            
             # Enrich response metadata with generation context
             if response and hasattr(response, 'metadata'):
                 response.metadata.update({
@@ -411,6 +503,43 @@ class LLMManager:
             logger.error(f"LLM call failed after {error_time:.2f}s: {e}")
             raise
         
+    def diagnose_provider_config(self, provider: str) -> dict[str, Any]:
+        """
+        Diagnose provider configuration issues.
+        
+        Args:
+            provider: Provider to diagnose
+            
+        Returns:
+            Configuration diagnosis
+        """
+        diagnosis = {"provider": provider, "configured": False, "issues": []}
+        
+        if provider == "openai":
+            if settings.llm.openai_api_key:
+                diagnosis["configured"] = True
+                diagnosis["api_key_length"] = len(settings.llm.openai_api_key)
+                diagnosis["api_key_prefix"] = settings.llm.openai_api_key[:8] + "..." if len(settings.llm.openai_api_key) > 8 else "short"
+            else:
+                diagnosis["issues"].append("LLM_OPENAI_API_KEY not set in environment")
+                
+        elif provider == "anthropic":
+            if settings.llm.anthropic_api_key:
+                diagnosis["configured"] = True
+                diagnosis["api_key_length"] = len(settings.llm.anthropic_api_key)
+                diagnosis["api_key_prefix"] = settings.llm.anthropic_api_key[:8] + "..." if len(settings.llm.anthropic_api_key) > 8 else "short"
+            else:
+                diagnosis["issues"].append("LLM_ANTHROPIC_API_KEY not set in environment")
+                
+        elif provider == "ollama":
+            if settings.llm.ollama_base_url:
+                diagnosis["configured"] = True
+                diagnosis["base_url"] = settings.llm.ollama_base_url
+            else:
+                diagnosis["issues"].append("LLM_OLLAMA_BASE_URL not set in environment")
+                
+        return diagnosis
+
     async def test_connection(self, provider: str | None = None) -> dict[str, Any]:
         """
         Test connection to LLM provider.
@@ -427,34 +556,104 @@ class LLMManager:
         if provider:
             providers_to_test = [provider]
         else:
-            if settings.llm.openai_api_key:
+            # Always test OpenAI if it should be available (even if key is missing)
+            if settings.llm.openai_api_key or self.model_type.value == "openai":
                 providers_to_test.append("openai")
-            if settings.llm.anthropic_api_key:
+            if settings.llm.anthropic_api_key or self.model_type.value == "anthropic":
                 providers_to_test.append("anthropic")
             if settings.llm.ollama_base_url:
                 providers_to_test.append("ollama")
+        
+        # Default test models for each provider - use current model if available
+        test_models = {
+            "openai": settings.llm.openai_model if hasattr(settings.llm, 'openai_model') else "gpt-4o-mini",
+            "anthropic": settings.llm.anthropic_model if hasattr(settings.llm, 'anthropic_model') else "claude-3-5-haiku-20241022", 
+            "ollama": self.default_model if self.model_type.value == "ollama" else "llama3:8b"
+        }
                 
         for prov in providers_to_test:
+            # Add configuration diagnosis
+            config_diagnosis = self.diagnose_provider_config(prov)
+            
             try:
+                # Use current selected model if it matches the provider
+                test_model = test_models.get(prov)
+                if prov == self.model_type.value:
+                    test_model = self.default_model
+                    
                 response = await self.generate_response(
                     "Test message. Please respond with 'OK'.",
                     provider=prov,
+                    model=test_model,
                     max_tokens=10
                 )
                 results[prov] = {
                     "status": "success",
                     "model": response.model,
                     "response_length": len(response.content),
-                    "usage": response.usage
+                    "usage": response.usage,
+                    "config": config_diagnosis
                 }
             except Exception as e:
                 results[prov] = {
                     "status": "error",
-                    "error": str(e)
+                    "error": str(e),
+                    "config": config_diagnosis
                 }
                 
         return results
         
+    async def download_ollama_model(self, model_name: str) -> dict[str, Any]:
+        """
+        Download an Ollama model.
+        
+        Args:
+            model_name: Name of the model to download
+            
+        Returns:
+            Download status and progress info
+        """
+        if not settings.llm.ollama_base_url:
+            return {"status": "error", "error": "Ollama not configured"}
+            
+        try:
+            logger.info(f"Starting download of Ollama model: {model_name}")
+            
+            async with httpx.AsyncClient(timeout=1800) as client:  # 30 minute timeout for downloads
+                response = await client.post(
+                    f"{settings.llm.ollama_base_url}/api/pull",
+                    json={"name": model_name, "stream": False}
+                )
+                response.raise_for_status()
+                
+            result = response.json()
+            logger.info(f"Successfully downloaded Ollama model: {model_name}")
+            
+            return {
+                "status": "success",
+                "model": model_name,
+                "message": f"Model {model_name} downloaded successfully"
+            }
+            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to download Ollama model {model_name}: {e.response.status_code} - {e.response.text}")
+            return {
+                "status": "error",
+                "error": f"Download failed: HTTP {e.response.status_code}"
+            }
+        except httpx.RequestError as e:
+            logger.error(f"Connection error downloading Ollama model {model_name}: {e}")
+            return {
+                "status": "error", 
+                "error": f"Connection error: {e}"
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error downloading Ollama model {model_name}: {e}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+
     async def list_available_models(self, provider: str | None = None) -> dict[str, list[str]]:
         """
         List available models for each provider.
@@ -504,6 +703,69 @@ def get_llm_manager() -> LLMManager:
     if _llm_manager is None:
         _llm_manager = LLMManager()
     return _llm_manager
+
+
+def switch_llm_provider(provider: ModelType, model: str | None = None) -> bool:
+    """
+    Switch LLM provider and optionally model.
+    
+    Args:
+        provider: Provider type (openai, anthropic, ollama)
+        model: Specific model to use (optional)
+        
+    Returns:
+        True if switch was successful
+    """
+    try:
+        global _llm_manager
+        if _llm_manager is not None:
+            _llm_manager.model_type = provider
+            if model:
+                _llm_manager.default_model = model
+        
+        # Update settings (note: this doesn't persist to file)
+        settings.llm.model_type = provider
+        if model:
+            settings.llm.default_model = model
+            
+        logger.info(f"Switched LLM provider to {provider} with model {model or 'default'}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to switch LLM provider: {e}")
+        return False
+
+
+def get_available_models() -> dict[str, list[str]]:
+    """Get available models for each provider."""
+    return {
+        "openai": [
+            "gpt-4o",
+            "gpt-4o-mini", 
+            "gpt-4-turbo",
+            "gpt-3.5-turbo"
+        ],
+        "anthropic": [
+            "claude-3-5-sonnet-20241022",
+            "claude-3-5-haiku-20241022",
+            "claude-3-opus-20240229"
+        ],
+        "ollama": [
+            "llama3:8b",
+            "mistral:7b",
+            "qwen3:14b"
+        ]
+    }
+
+
+def get_current_llm_config() -> dict[str, Any]:
+    """Get current LLM configuration."""
+    manager = get_llm_manager()
+    return {
+        "provider": manager.model_type.value,
+        "model": manager.default_model,
+        "available_models": get_available_models()
+    }
 
 
 # Convenience functions
@@ -569,6 +831,41 @@ def generate_llm_response_sync(
     return loop.run_until_complete(
         generate_llm_response(prompt, system_prompt, model, **kwargs)
     )
+
+
+def download_ollama_model_sync(model_name: str) -> dict[str, Any]:
+    """
+    Synchronous wrapper for download_ollama_model.
+    
+    Args:
+        model_name: Name of the model to download
+        
+    Returns:
+        Download status
+    """
+    import asyncio
+    
+    logger.info(f"[SYNC] Starting download of Ollama model: {model_name}")
+    
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            manager = get_llm_manager()
+            logger.info(f"[SYNC] Created LLM manager, calling async download...")
+            result = loop.run_until_complete(manager.download_ollama_model(model_name))
+            logger.info(f"[SYNC] Async download completed with result: {result}")
+            return result
+        finally:
+            loop.close()
+            
+    except Exception as e:
+        logger.error(f"[SYNC] Error in sync Ollama model download: {e}")
+        return {
+            "status": "error",
+            "error": str(e)
+        }
 
 
 def test_llm_connection_sync(provider: str | None = None) -> dict[str, Any]:

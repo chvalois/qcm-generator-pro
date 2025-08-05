@@ -12,15 +12,11 @@ This document provides comprehensive context for developing the QCM Generator Pr
 To Do Next
 
 - Espaces en trop dans les mots lorsque PDF avec polices trop larges
-- Tester LangChain + pyMuPDF (unstructured trop cher) pour le découpage des chunks + Ragas pour l'évaluation
-- Regarder du côté de : https://github.com/huridocs/pdf-document-layout-analysis
 - Redécouper Streamlit app (1200 lignes +)
-- Faire fonctionner avec Docker
-- Faire fonctionner en local sur RTX 4090 avec Ollama
 - Améliorer tests
 - Refactor avec Clean Archi + SOLID
 - Modifier le front avec du React ald Streamlit
-- Uniformisation des questions et des réponses : ajouter few shots ?
+
 
 ---
 

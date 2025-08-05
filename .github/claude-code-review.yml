@@ -1,0 +1,180 @@
+# Claude Code Review Configuration
+# This file configures automated code review for the QCM Generator Pro project
+
+name: "QCM Generator Pro Code Review"
+description: "Automated code review using Claude for QCM Generator Pro application"
+
+# Review scope and focus areas
+review_scope:
+  # Files and directories to include in review
+  include:
+    - "src/**/*.py"
+    - "tests/**/*.py" 
+    - "scripts/**/*.py"
+    - "*.py"
+    - "pyproject.toml"
+    - "requirements*.txt"
+    - "docker-compose*.yml"
+    - "Dockerfile"
+    - "Makefile"
+    - "README.md"
+    - "CLAUDE.md"
+  
+  # Files and directories to exclude from review
+  exclude:
+    - "data/**"
+    - "logs/**"
+    - "models/**"
+    - "__pycache__/**"
+    - "*.pyc"
+    - ".git/**"
+    - ".venv/**"
+    - "node_modules/**"
+
+# Review criteria and focus areas
+review_criteria:
+  # Code quality standards
+  code_quality:
+    - "Follow Python PEP 8 style guidelines"
+    - "Ensure proper error handling and exception management"
+    - "Check for code duplication and suggest refactoring opportunities"
+    - "Verify proper logging practices (use logger, not print statements)"
+    - "Ensure proper docstring documentation for functions and classes"
+    - "Check for security vulnerabilities (API keys, SQL injection, etc.)"
+    
+  # Architecture and design principles
+  architecture:
+    - "Adherence to SOLID principles (Single Responsibility, Open/Closed, etc.)"
+    - "Proper separation of concerns between layers (API, services, models)"
+    - "Clean Architecture patterns and dependency inversion"
+    - "Appropriate use of design patterns (Factory, Builder, Strategy, etc.)"
+    - "Service layer organization and interface design"
+    - "Proper dependency injection and IoC container usage"
+    
+  # QCM Generator Pro specific concerns
+  domain_specific:
+    - "PDF processing efficiency and memory management"
+    - "LLM integration best practices and error handling"
+    - "Question generation quality and validation logic"
+    - "RAG engine performance and vector store optimization"
+    - "Multi-language support and internationalization"
+    - "Docker containerization and deployment considerations"
+    - "Database schema and ORM usage (SQLAlchemy)"
+    - "Async/await patterns for LLM calls and I/O operations"
+    
+  # Testing and reliability
+  testing:
+    - "Adequate test coverage for new functionality"
+    - "Proper unit test structure and mocking strategies"
+    - "Integration test scenarios for critical workflows"
+    - "Performance test considerations for large PDF processing"
+    - "Error scenario testing and edge case handling"
+    
+  # Performance and scalability
+  performance:
+    - "Efficient memory usage, especially for large PDF documents"
+    - "Proper async/await usage for I/O operations"
+    - "Database query optimization and N+1 query prevention"
+    - "Caching strategies for expensive operations"
+    - "Resource cleanup and connection management"
+    
+# Review output format and requirements
+review_format:
+  # Structure of the review comments
+  comment_structure:
+    - "Provide specific line-by-line feedback when applicable"
+    - "Suggest concrete improvements with code examples"
+    - "Explain the reasoning behind recommendations"
+    - "Categorize issues by severity (Critical, Major, Minor, Suggestion)"
+    - "Reference relevant best practices and documentation"
+    
+  # Required sections in review
+  required_sections:
+    - "Executive Summary"
+    - "Critical Issues" 
+    - "Architecture & Design Feedback"
+    - "Code Quality Assessment"
+    - "Testing Recommendations"
+    - "Performance Considerations"
+    - "Security Review"
+    - "Refactoring Opportunities"
+    - "Overall Assessment and Next Steps"
+
+# Project context for reviewers
+project_context:
+  description: "QCM Generator Pro is a local multilingual QCM generation system from PDF documents"
+  
+  key_technologies:
+    - "Python 3.10+ with FastAPI and Streamlit"
+    - "LangChain for LLM integration (OpenAI, Anthropic, Ollama)"
+    - "ChromaDB for RAG vector storage"
+    - "SQLAlchemy for database ORM"
+    - "Docker for containerization"
+    - "pytest for testing"
+    - "LangSmith for LLM call tracking"
+    
+  current_architecture:
+    - "Service-oriented architecture with clear layer separation"
+    - "FastAPI backend with REST endpoints"
+    - "Streamlit frontend for user interface"
+    - "Pluggable LLM providers with fallback mechanisms"
+    - "Progressive QCM generation workflow (1→5→all questions)"
+    - "Multi-format export (CSV for Udemy, JSON)"
+    
+  known_technical_debt:
+    - "Streamlit app is 1200+ lines and needs componentization"
+    - "Service layer could benefit from more SOLID principles"
+    - "Dependency injection could be improved"
+    - "Some services have multiple responsibilities"
+    - "Testing coverage could be expanded"
+    
+# Special instructions for reviewers
+reviewer_instructions:
+  priorities:
+    - "Focus on Clean Architecture and SOLID principles compliance"
+    - "Identify opportunities for breaking down large components"
+    - "Suggest improvements for testability and maintainability" 
+    - "Consider scalability for enterprise deployment"
+    - "Evaluate security practices for API keys and user data"
+    
+  context_awareness:
+    - "This is an educational/professional tool, not a consumer app"
+    - "Performance is important for large PDF processing"
+    - "Multi-language support is a key requirement"
+    - "Local deployment (Docker) is the primary use case"
+    - "LLM costs should be optimized (token usage)"
+    
+# Review automation settings
+automation:
+  # Trigger conditions
+  triggers:
+    - "Pull request opened"
+    - "Pull request updated with new commits"
+    - "Manual review request via comment"
+    
+  # Auto-approval criteria (if applicable)
+  auto_approve:
+    conditions:
+      - "Only documentation changes"
+      - "Only test file changes with no logic changes"
+      - "Configuration file updates (non-breaking)"
+    
+  # Review assignment
+  assignment:
+    primary_reviewer: "claude-3-5-sonnet"
+    backup_reviewer: "claude-3-haiku"
+    
+# Integration settings
+integrations:
+  github:
+    # PR comment settings
+    comment_settings:
+      collapse_minor_issues: true
+      group_similar_issues: true
+      include_line_numbers: true
+      
+  # CI/CD integration
+  ci_cd:
+    block_merge_on_critical: true
+    require_review_approval: true
+    run_additional_checks: ["lint", "type-check", "security-scan"]
