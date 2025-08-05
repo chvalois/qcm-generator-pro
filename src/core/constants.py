@@ -74,7 +74,7 @@ MIN_TEXT_LENGTH = 100  # Minimum text for processing
 # ============================================================================
 
 # Chunk size limits
-DEFAULT_CHUNK_SIZE = 1000
+DEFAULT_CHUNK_SIZE = 2000
 MIN_CHUNK_SIZE = 100
 MAX_CHUNK_SIZE = 4000
 
