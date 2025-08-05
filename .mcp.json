@@ -15,26 +15,10 @@
       "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
       "env": {}
     },
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/user/Documents", "/home/user/Projects"],
-      "env": {}
-    },
     "memory": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-memory"],
       "env": {}
-    },
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "YOUR_GITHUB_TOKEN"
-      }
-    },
-    "serena": {
-      "command": "/usr/local/bin/uv",
-      "args": ["run", "--directory", "/mnt/c/Users/massi/Dev/serena", "serena-mcp-server"]
     }
   }
 }
