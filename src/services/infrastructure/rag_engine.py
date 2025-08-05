@@ -12,8 +12,8 @@ import uuid
 from pathlib import Path
 from typing import Any, List, Dict, Optional
 
-from ..core.config import settings
-from ..models.schemas import DocumentChunk, QuestionContext
+from src.core.config import settings
+from src.models.schemas import DocumentChunk, QuestionContext
 
 try:
     import chromadb

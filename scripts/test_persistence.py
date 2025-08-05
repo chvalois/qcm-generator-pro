@@ -13,8 +13,8 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
 
-from src.services.rag_engine import get_rag_engine, switch_rag_engine
-from src.services.document_manager import get_document_manager
+from src.services.infrastructure.rag_engine import get_rag_engine, switch_rag_engine
+from src.services.document.document_manager import get_document_manager
 from src.core.config import settings
 
 logging.basicConfig(level=logging.INFO)

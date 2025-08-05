@@ -12,8 +12,8 @@ from typing import Any, Optional
 
 import httpx
 
-from ..core.config import settings
-from ..models.enums import ModelType
+from src.core.config import settings
+from src.models.enums import ModelType
 from .langsmith_tracker import get_langsmith_tracker
 
 # LangSmith imports

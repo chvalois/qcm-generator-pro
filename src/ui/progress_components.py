@@ -9,7 +9,7 @@ import time
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from src.services.progress_tracker import get_progress_tracker, ProgressState, ProgressStatus
+from src.services.infrastructure.progress_tracker import get_progress_tracker, ProgressState, ProgressStatus
 
 
 class ProgressDisplay:

@@ -14,12 +14,12 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker, Session
 
-from ..core.config import settings
-from ..models.database import Document, DocumentTheme, DocumentChunk, Base
-from ..models.schemas import DocumentCreate, ThemeDetection, ProcessingConfig
+from src.core.config import settings
+from src.models.database import Document, DocumentTheme, DocumentChunk, Base
+from src.models.schemas import DocumentCreate, ThemeDetection, ProcessingConfig
 from .pdf_processor import process_pdf
 from .theme_extractor import extract_document_themes
-from .rag_engine import get_rag_engine
+from src.services.infrastructure.rag_engine import get_rag_engine
 
 logger = logging.getLogger(__name__)
 

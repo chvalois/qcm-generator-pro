@@ -26,27 +26,27 @@ load_dotenv()
 from src.core.config import settings
 from src.models.enums import Difficulty, ExportFormat, Language, QuestionType
 from src.models.schemas import GenerationConfig, GenerationSessionCreate
-from src.services.document_manager import (
+from src.services.document.document_manager import (
     get_available_themes,
     get_document_chunks,
     get_document_manager,
     get_stored_document,
     list_stored_documents,
 )
-from src.services.llm_manager import generate_llm_response_sync, test_llm_connection
-from src.services.pdf_processor import process_pdf, validate_pdf_file
-from src.services.qcm_generator import generate_progressive_qcm
+from src.services.llm.llm_manager import generate_llm_response_sync, test_llm_connection
+from src.services.document.pdf_processor import process_pdf, validate_pdf_file
+from src.services.generation.qcm_generator import generate_progressive_qcm
 from src.ui.progress_components import ProgressDisplay, create_progress_placeholder, update_progress_placeholder
-from src.services.progress_tracker import get_progress_state
-from src.services.rag_engine import (
+from src.services.infrastructure.progress_tracker import get_progress_state
+from src.services.infrastructure.rag_engine import (
     add_document_to_rag,
     get_question_context,
     get_rag_engine,
     switch_rag_engine,
 )
-from src.services.theme_extractor import extract_document_themes_sync
-from src.services.validator import validate_questions_batch
-from src.services.simple_examples_loader import get_examples_loader
+from src.services.document.theme_extractor import extract_document_themes_sync
+from src.services.quality.validator import validate_questions_batch
+from src.services.llm.simple_examples_loader import get_examples_loader
 
 logger = logging.getLogger(__name__)
 
@@ -326,7 +326,7 @@ class StreamlitQCMInterface:
                 # Direct generation for single question
                 import asyncio
 
-                from src.services.qcm_generator import generate_qcm_question
+                from src.services.generation.qcm_generator import generate_qcm_question
 
                 question = asyncio.run(generate_qcm_question(
                     topic=topics[0] if topics else "Contenu général",
@@ -424,7 +424,7 @@ class StreamlitQCMInterface:
                         try:
                             import asyncio
 
-                            from src.services.qcm_generator import generate_qcm_question
+                            from src.services.generation.qcm_generator import generate_qcm_question
 
                             question = asyncio.run(generate_qcm_question(
                                 topic=topics[0] if topics else "Contenu général",
@@ -502,8 +502,8 @@ class StreamlitQCMInterface:
                     import time
                     import threading
 
-                    from src.services.qcm_generator import QCMGenerator
-                    from src.services.progress_tracker import start_progress_session, get_progress_state
+                    from src.services.generation.qcm_generator import QCMGenerator
+                    from src.services.infrastructure.progress_tracker import start_progress_session, get_progress_state
 
                     progress_session_id = f"phase2_{uuid.uuid4().hex[:8]}"
                     start_progress_session(
@@ -652,8 +652,8 @@ class StreamlitQCMInterface:
                         import time
                         import threading
 
-                        from src.services.qcm_generator import QCMGenerator
-                        from src.services.progress_tracker import start_progress_session, get_progress_state
+                        from src.services.generation.qcm_generator import QCMGenerator
+                        from src.services.infrastructure.progress_tracker import start_progress_session, get_progress_state
 
                         progress_session_id = f"phase3_{uuid.uuid4().hex[:8]}"
                         start_progress_session(
@@ -897,7 +897,7 @@ class StreamlitQCMInterface:
     def test_llm_connection(self) -> str:
         """Test LLM connectivity."""
         try:
-            from src.services.llm_manager import test_llm_connection_sync, get_current_llm_config, download_ollama_model_sync
+            from src.services.llm.llm_manager import test_llm_connection_sync, get_current_llm_config, download_ollama_model_sync
 
             # Get current configuration
             current_config = get_current_llm_config()
@@ -968,7 +968,7 @@ class StreamlitQCMInterface:
     def show_ollama_model_downloads(self):
         """Show download buttons for missing Ollama models."""
         try:
-            from src.services.llm_manager import test_llm_connection_sync, download_ollama_model_sync
+            from src.services.llm.llm_manager import test_llm_connection_sync, download_ollama_model_sync
             
             # Get test results to check for missing models (use cached if available)
             if 'last_connection_test' in st.session_state:
@@ -2319,7 +2319,7 @@ def create_streamlit_interface():
         
         # Get title structure
         try:
-            from src.services.title_based_generator import get_title_based_generator
+            from src.services.generation.title_based_generator import get_title_based_generator
             title_generator = get_title_based_generator()
             
             # Show loading while analyzing
@@ -2446,7 +2446,7 @@ def create_streamlit_interface():
             
             # Preview selection
             if any([final_h1, final_h2, final_h3, final_h4]):
-                from src.services.title_based_generator import TitleSelectionCriteria
+                from src.services.generation.title_based_generator import TitleSelectionCriteria
                 
                 criteria = TitleSelectionCriteria(
                     document_id=str(selected_doc_id),
@@ -2608,7 +2608,7 @@ def create_streamlit_interface():
                             import threading
                             from src.models.schemas import GenerationConfig
                             from src.models.enums import Language, Difficulty, QuestionType
-                            from src.services.progress_tracker import start_progress_session, get_progress_state
+                            from src.services.infrastructure.progress_tracker import start_progress_session, get_progress_state
                             
                             # Start progress tracking
                             progress_session_id = f"title_{uuid.uuid4().hex[:8]}"
@@ -2776,7 +2776,7 @@ def create_streamlit_interface():
                         
                         except Exception as e:
                             # Fail progress session on error
-                            from src.services.progress_tracker import fail_progress_session
+                            from src.services.infrastructure.progress_tracker import fail_progress_session
                             fail_progress_session(
                                 progress_session_id,
                                 error_message=str(e),
@@ -2855,7 +2855,7 @@ def create_streamlit_interface():
         st.subheader("🤖 Configuration LLM")
         
         try:
-            from src.services.llm_manager import get_current_llm_config, switch_llm_provider
+            from src.services.llm.llm_manager import get_current_llm_config, switch_llm_provider
             from src.models.enums import ModelType
             
             # Check for session override first

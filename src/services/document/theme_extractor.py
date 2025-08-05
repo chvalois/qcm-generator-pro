@@ -9,9 +9,9 @@ import json
 import logging
 from typing import Any, Optional, Union, List, Dict
 
-from ..core.config import settings
-from ..models.schemas import ThemeDetection
-from .llm_manager import generate_llm_response, LLMError
+from src.core.config import settings
+from src.models.schemas import ThemeDetection
+from src.services.llm.llm_manager import generate_llm_response, LLMError
 
 logger = logging.getLogger(__name__)
 

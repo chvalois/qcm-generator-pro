@@ -155,8 +155,8 @@ def check_current_workflow():
     
     try:
         # Check if services use the database
-        from src.services.pdf_processor import process_pdf
-        from src.services.rag_engine import get_rag_engine
+        from src.services.document.pdf_processor import process_pdf
+        from src.services.infrastructure.rag_engine import get_rag_engine
         
         print("✅ Services importés avec succès")
         

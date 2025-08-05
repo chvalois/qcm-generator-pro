@@ -15,8 +15,8 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from src.services.simple_examples_loader import get_examples_loader
-from src.services.question_prompt_builder import get_question_prompt_builder  
+from src.services.llm.simple_examples_loader import get_examples_loader
+from src.services.generation.question_prompt_builder import get_question_prompt_builder  
 from src.models.enums import QuestionType, Difficulty, Language
 from src.models.schemas import QuestionContext, GenerationConfig
 

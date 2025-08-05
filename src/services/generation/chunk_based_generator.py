@@ -11,12 +11,12 @@ from typing import Dict, List, Optional, Tuple
 
 from src.models.enums import Difficulty, Language, QuestionType
 from src.models.schemas import DocumentChunk, GenerationConfig, QuestionCreate, QuestionContext
-from src.services.llm_manager import get_llm_manager
-from src.services.question_prompt_builder import get_question_prompt_builder
-from src.services.question_parser import get_question_parser
-from src.services.question_selection import get_question_selector
-from src.services.document_manager import get_document_manager
-from src.services.progress_tracker import update_progress, increment_progress
+from src.services.llm.llm_manager import get_llm_manager
+from src.services.generation.question_prompt_builder import get_question_prompt_builder
+from src.services.generation.question_parser import get_question_parser
+from src.services.generation.question_selection import get_question_selector
+from src.services.document.document_manager import get_document_manager
+from src.services.infrastructure.progress_tracker import update_progress, increment_progress
 
 logger = logging.getLogger(__name__)
 

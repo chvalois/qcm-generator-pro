@@ -11,11 +11,8 @@ This document provides comprehensive context for developing the QCM Generator Pr
 
 To Do Next
 
-- Espaces en trop dans les mots lorsque PDF avec polices trop larges
-- Redécouper Streamlit app (1200 lignes +)
+- Cleaner l'architecture Streamlit en components dans l'idée de passer à du React ensuite
 - Améliorer tests
-- Refactor avec Clean Archi + SOLID
-- Modifier le front avec du React ald Streamlit
 
 
 ---
