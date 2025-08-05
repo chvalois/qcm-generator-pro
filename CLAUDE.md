@@ -11,8 +11,15 @@ This document provides comprehensive context for developing the QCM Generator Pr
 
 To Do Next
 
-- Cleaner l'architecture Streamlit en components dans l'idée de passer à du React ensuite
-- Améliorer tests
+✅ **COMPLETED** - Services Architecture Reorganization (January 2025)
+- Réorganisé 21 services en 5 domaines métier
+- Mis à jour 50+ imports dans toute la codebase
+- Structure claire : document/, generation/, quality/, llm/, infrastructure/
+
+**NEXT PRIORITIES:**
+- Cleaner l'architecture Streamlit en components (Phase 2 - prêt à démarrer)
+- Passer à du React à terme pour remplacer Streamlit
+- Améliorer tests avec la nouvelle architecture
 
 
 ---
@@ -99,15 +106,39 @@ qcm-generator/
 │   │   ├── database.py        # SQLAlchemy models
 │   │   ├── schemas.py         # Pydantic schemas
 │   │   └── enums.py           # Enums (types questions, etc.)
-│   ├── services/
+│   ├── services/              # 🎯 NOUVELLE ARCHITECTURE (Jan 2025)
 │   │   ├── __init__.py
-│   │   ├── pdf_processor.py   # Traitement PDF + thèmes
-│   │   ├── theme_extractor.py # Extraction thématique
-│   │   ├── rag_engine.py      # ChromaDB + retrieval
-│   │   ├── llm_manager.py     # Gestion multi-LLM
-│   │   ├── qcm_generator.py   # Génération questions
-│   │   ├── validator.py       # Validation questions
-│   │   └── exporter.py        # Export CSV Udemy
+│   │   ├── document/          # Documents & PDF processing
+│   │   │   ├── __init__.py
+│   │   │   ├── pdf_processor.py     # Extraction PDF + métadonnées
+│   │   │   ├── theme_extractor.py   # Extraction thématique LLM
+│   │   │   ├── title_detector.py    # Détection titres documents
+│   │   │   └── document_manager.py  # Gestion cycle de vie docs
+│   │   ├── generation/        # Génération QCM & workflows
+│   │   │   ├── __init__.py
+│   │   │   ├── qcm_generator.py           # Générateur principal
+│   │   │   ├── chunk_based_generator.py   # Génération par chunks
+│   │   │   ├── title_based_generator.py   # Génération par titres
+│   │   │   ├── enhanced_qcm_generator.py  # Génération avancée
+│   │   │   ├── progressive_workflow.py    # Workflow 1→5→all
+│   │   │   ├── question_prompt_builder.py # Construction prompts
+│   │   │   ├── question_parser.py         # Parse JSON questions
+│   │   │   └── question_selection.py      # Sélection & filtrage
+│   │   ├── quality/           # Assurance qualité
+│   │   │   ├── __init__.py
+│   │   │   ├── validator.py                    # Validation questions
+│   │   │   ├── question_deduplicator.py        # Déduplication
+│   │   │   ├── question_diversity_enhancer.py  # Amélioration diversité
+│   │   │   └── chunk_variety_validator.py      # Validation variété chunks
+│   │   ├── llm/              # Intégration LLM
+│   │   │   ├── __init__.py
+│   │   │   ├── llm_manager.py           # Gestion multi-providers
+│   │   │   ├── langsmith_tracker.py     # Tracking LangSmith
+│   │   │   └── simple_examples_loader.py # Gestion exemples few-shot
+│   │   └── infrastructure/    # Services infrastructure
+│   │       ├── __init__.py
+│   │       ├── rag_engine.py      # ChromaDB + recherche vectorielle
+│   │       └── progress_tracker.py # Suivi progrès temps réel
 │   ├── prompts/
 │   │   ├── __init__.py
 │   │   ├── templates.py       # Templates multilingues
@@ -162,6 +193,41 @@ qcm-generator/
 ├── CLAUDE.md                  # This file
 └── Makefile
 ```
+
+## 🎯 **NOUVELLE ARCHITECTURE SERVICES** *(Janvier 2025)*
+
+### Architecture Réorganisée par Domaines Métier
+
+L'architecture des services a été **complètement réorganisée** pour une meilleure maintenabilité et séparation des responsabilités :
+
+#### **🏗️ Structure Actuelle (21 services → 5 domaines)**
+```
+src/services/
+├── document/          # 📄 Gestion documents (4 services)
+├── generation/        # ⚡ Génération QCM (8 services)  
+├── quality/          # ✅ Assurance qualité (4 services)
+├── llm/             # 🤖 Intégration LLM (3 services)
+└── infrastructure/   # 🔧 Services infrastructure (2 services)
+```
+
+#### **🔄 Imports Mis à Jour**
+- **Avant** : `from src.services.llm_manager import ...`
+- **Après** : `from src.services.llm.llm_manager import ...`
+
+#### **📦 Exports Publics**
+Chaque domaine expose une API publique via `__init__.py` :
+```python
+# Exemple : src.services.generation
+from src.services.generation import get_qcm_generator, generate_progressive_qcm
+```
+
+#### **✅ Validation**
+- **21/21 tests** passent toujours ✅
+- **50+ imports** mis à jour dans toute la codebase
+- **Scripts** `/scripts/` corrigés pour les nouveaux chemins
+- **Interface Streamlit** fonctionne avec la nouvelle architecture
+
+---
 
 ## 📋 Development Best Practices
 
@@ -528,14 +594,26 @@ repos:
 
 ## 🎯 Key Implementation Notes
 
-### Current Branch: `questions_fewshots`
-This branch focuses on few-shot learning integration and question quality improvements.
+### Current Branch: `clean_architecture`
+Cette branche contient la **réorganisation complète des services** en domaines métier (Janvier 2025).
 
-**Recent Changes:**
-- Added `simple_examples_loader.py` for few-shot example management
-- Implemented `langsmith_tracker.py` for LLM call tracking and monitoring
-- Enhanced question generation with few-shot examples from `data/few_shot_examples/`
-- Updated LLM manager to support LangSmith integration
+**Changements Majeurs :**
+- ✅ **Réorganisation Services** : 21 services → 5 domaines métier
+- ✅ **Architecture Propre** : Séparation claire des responsabilités
+- ✅ **Imports Mis à Jour** : 50+ imports corrigés dans toute la codebase
+- ✅ **Tests Validés** : 21/21 tests passent avec la nouvelle architecture
+- ✅ **Scripts Corrigés** : Tous les scripts dans `/scripts/` utilisent les nouveaux chemins
+
+**Branches Précédentes :**
+- `questions_fewshots` : Few-shot learning + LangSmith tracking ✅
+- `fix_ollama` : Correction intégration Ollama + OpenAI ✅
+
+**Services Réorganisés par Domaine :**
+- 📄 **document/** : PDF processing, theme extraction (4 services)
+- ⚡ **generation/** : QCM generation, workflows, prompts (8 services)
+- ✅ **quality/** : Validation, deduplication, diversity (4 services)
+- 🤖 **llm/** : LLM providers, tracking, examples (3 services)
+- 🔧 **infrastructure/** : RAG engine, progress tracking (2 services)
 
 ### Few-Shot Learning Integration
 - **Examples Storage**: `data/few_shot_examples/` contains JSON files with domain-specific examples
