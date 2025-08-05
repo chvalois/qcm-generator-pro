@@ -11,8 +11,6 @@ This document provides comprehensive context for developing the QCM Generator Pr
 
 To Do Next
 
-- Ajouter des exemples de questions attendues + orienter vers des questions plus "hands-on" => tester si o3 c'est mieux
-- Cleaner le .env 
 - Espaces en trop dans les mots lorsque PDF avec polices trop larges
 - Tester LangChain + pyMuPDF (unstructured trop cher) pour le découpage des chunks + Ragas pour l'évaluation
 - Regarder du côté de : https://github.com/huridocs/pdf-document-layout-analysis

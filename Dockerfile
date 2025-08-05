@@ -33,7 +33,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY src/ ./src/
 COPY scripts/ ./scripts/
 COPY Makefile ./
-COPY .env ./.env
 
 # Create data directories with proper permissions
 RUN mkdir -p data/pdfs data/vectorstore data/database data/exports data/cache logs uploads && \

@@ -1,4 +1,7 @@
 # QCM Generator Pro - Docker Compose Configuration
+
+# Load environment variables from .env.docker file
+# Copy .env.docker.example to .env.docker and set your API keys
 services:
   # Ollama Service (Local LLM Server)
   ollama:
@@ -33,6 +36,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: qcm_generator_pro
+    env_file:
+      - .env.docker
     ports:
       - "8001:8001"  # FastAPI
       - "8501:8501"  # Streamlit
@@ -41,14 +46,41 @@ services:
       - ./logs:/app/logs
       - qcm_uploads:/app/uploads
     environment:
+      # Docker Environment
       - PYTHONPATH=/app
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      
+      # Database
       - DATABASE_URL=sqlite:///./data/database/qcm_generator.db
-      - DEFAULT_LLM=ollama
+      
+      # LLM Configuration
+      - LLM_DEFAULT_MODEL=gpt-4o-mini
+      - LLM_MODEL_TYPE=openai
+      - LLM_OLLAMA_BASE_URL=http://ollama:11434
+      - LLM_OLLAMA_TIMEOUT=120
+      - LLM_OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - LLM_OPENAI_MODEL=gpt-4o-mini
+      - LLM_OPENAI_TIMEOUT=120
+      - LLM_DEFAULT_TEMPERATURE=0.7
+      - LLM_DEFAULT_MAX_TOKENS=512
+      - LLM_DEFAULT_TOP_P=0.9
+      
+      # Processing Configuration
+      - PROCESSING_CHUNK_SIZE=2000
+      - PROCESSING_CHUNK_OVERLAP=200
+      - PROCESSING_MAX_PDF_SIZE_MB=50
+      
+      # Server Configuration
+      - API_HOST=0.0.0.0
+      - API_PORT=8001
+      - UI_HOST=0.0.0.0
+      - UI_PORT=8501
+      
+      # Application Configuration
+      - APP_NAME=QCM Generator Pro
       - DEBUG=false
-      - LOG_LEVEL=INFO
-      - DEFAULT_LANGUAGE=fr
-      - SUPPORTED_LANGUAGES=["fr","en","es","de"]
+      - ENVIRONMENT=production
     depends_on:
       ollama:
         condition: service_healthy
