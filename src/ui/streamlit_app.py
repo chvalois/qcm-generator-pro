@@ -46,6 +46,7 @@ from src.services.rag_engine import (
 )
 from src.services.theme_extractor import extract_document_themes_sync
 from src.services.validator import validate_questions_batch
+from src.services.simple_examples_loader import get_examples_loader
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,17 @@ class StreamlitQCMInterface:
             st.session_state.generated_questions = []
         if "processed_documents" not in st.session_state:
             st.session_state.processed_documents = {}
+
+        # Initialize examples loader
+        self.examples_loader = get_examples_loader()
+        
+    def get_available_example_files(self) -> List[str]:
+        """Get list of available few-shot example files."""
+        try:
+            return self.examples_loader.list_available_projects()
+        except Exception as e:
+            logger.error(f"Failed to get example files: {e}")
+            return []
 
     def _get_unique_filename(self, directory: Path, original_filename: str) -> Path:
         """
@@ -259,7 +271,9 @@ class StreamlitQCMInterface:
         difficulty_hard: float,
         mc_ratio: float,
         ms_ratio: float,
-        selected_themes: list[str]
+        selected_themes: list[str],
+        examples_file: Optional[str] = None,
+        max_examples: int = 3
     ) -> tuple[str, str, str]:
         """Generate QCM questions using progressive workflow."""
         try:
@@ -318,7 +332,9 @@ class StreamlitQCMInterface:
                     topic=topics[0] if topics else "Contenu général",
                     config=config,
                     document_ids=list(st.session_state.processed_documents.keys()),
-                    session_id=session_id
+                    session_id=session_id,
+                    examples_file=examples_file,
+                    max_examples=max_examples
                 ))
 
                 st.session_state.generated_questions = [question]
@@ -414,7 +430,9 @@ class StreamlitQCMInterface:
                                 topic=topics[0] if topics else "Contenu général",
                                 config=config,
                                 document_ids=list(st.session_state.processed_documents.keys()),
-                                session_id=session_id
+                                session_id=session_id,
+                                examples_file=session.get("examples_file"),
+                                max_examples=session.get("max_examples", 3)
                             ))
 
                             session["questions_so_far"] = [question]
@@ -509,7 +527,9 @@ class StreamlitQCMInterface:
                                 document_ids=list(st.session_state.processed_documents.keys()),
                                 batch_size=batch_size,
                                 session_id=session_id,
-                                progress_session_id=progress_session_id
+                                progress_session_id=progress_session_id,
+                                examples_file=session.get("examples_file"),
+                                max_examples=session.get("max_examples", 3)
                             ))
                             questions_result[0] = result
                         except Exception as e:
@@ -657,7 +677,9 @@ class StreamlitQCMInterface:
                                     document_ids=list(st.session_state.processed_documents.keys()),
                                     batch_size=remaining,
                                     session_id=session_id,
-                                    progress_session_id=progress_session_id
+                                    progress_session_id=progress_session_id,
+                                    examples_file=session.get("examples_file"),
+                                    max_examples=session.get("max_examples", 3)
                                 ))
                                 questions_result[0] = result
                             except Exception as e:
@@ -901,7 +923,9 @@ class StreamlitQCMInterface:
         difficulty_hard: float,
         mc_ratio: float,
         ms_ratio: float,
-        selected_themes: list[str]
+        selected_themes: list[str],
+        examples_file: Optional[str] = None,
+        max_examples: int = 3
     ) -> None:
         """Initialize progressive generation session."""
         from src.models.enums import Difficulty, Language, QuestionType
@@ -933,7 +957,9 @@ class StreamlitQCMInterface:
             "config": config,
             "topics": topics,
             "session_id": session_id,
-            "total_questions": num_questions
+            "total_questions": num_questions,
+            "examples_file": examples_file,
+            "max_examples": max_examples
         }
 
         st.session_state.current_session_id = session_id
@@ -1984,13 +2010,65 @@ def create_streamlit_interface():
                 selected_themes = []
                 st.info("Aucun thème disponible")
 
+            # Few-Shot Examples section
+            st.subheader("🎯 Few-Shot Examples (Nouveau!)")
+            
+            # Get available example files
+            available_examples = interface.get_available_example_files()
+            
+            if available_examples:
+                use_examples = st.checkbox(
+                    "Utiliser des exemples guidés",
+                    value=False,
+                    help="Active l'utilisation d'exemples pour améliorer la qualité des questions"
+                )
+                
+                if use_examples:
+                    selected_examples_file = st.selectbox(
+                        "Fichier d'exemples:",
+                        options=available_examples,
+                        help="Choisissez le fichier d'exemples correspondant à votre projet"
+                    )
+                    
+                    max_examples = st.slider(
+                        "Nombre d'exemples max:",
+                        min_value=1,
+                        max_value=5,
+                        value=3,
+                        help="Nombre maximum d'exemples à utiliser pour guider la génération"
+                    )
+                    
+                    # Preview examples
+                    if st.checkbox("Aperçu des exemples", value=False):
+                        examples = interface.examples_loader.get_examples_for_context(
+                            selected_examples_file, max_examples=max_examples
+                        )
+                        if examples:
+                            st.write(f"**📋 {len(examples)} exemple(s) trouvé(s):**")
+                            for i, ex in enumerate(examples, 1):
+                                with st.expander(f"Exemple {i}: {ex.get('theme', 'N/A')}"):
+                                    st.write(f"**Question:** {ex.get('question', '')}")
+                                    st.write(f"**Type:** {ex.get('type', 'N/A')} | **Difficulté:** {ex.get('difficulty', 'N/A')}")
+                        else:
+                            st.warning("Aucun exemple trouvé dans ce fichier")
+                else:
+                    selected_examples_file = None
+                    max_examples = 3
+            else:
+                use_examples = False
+                selected_examples_file = None  
+                max_examples = 3
+                st.info("💡 Aucun fichier d'exemples disponible. Créez des fichiers JSON dans `data/few_shot_examples/`")
+
             if st.button("🎯 Démarrer génération progressive", type="primary"):
                 # Initialize progressive generation session
                 interface.initialize_progressive_generation(
                     num_questions, language,
                     difficulty_easy, difficulty_medium, difficulty_hard,
                     mc_ratio, ms_ratio,
-                    selected_themes
+                    selected_themes,
+                    examples_file=selected_examples_file if use_examples else None,
+                    max_examples=max_examples if use_examples else 3
                 )
                 st.rerun()
 
@@ -2309,6 +2387,66 @@ def create_streamlit_interface():
                         help="Mixed: mélange de choix unique et multiple"
                     )
                 
+                # Few-Shot Examples section for title generation
+                st.subheader("🎯 Few-Shot Examples")
+                
+                # Get available example files
+                available_examples_title = interface.get_available_example_files()
+                
+                if available_examples_title:
+                    use_examples_title = st.checkbox(
+                        "Utiliser des exemples guidés pour génération par titre",
+                        value=False,
+                        key="use_examples_title",
+                        help="Active l'utilisation d'exemples pour améliorer la qualité des questions par titre"
+                    )
+                    
+                    if use_examples_title:
+                        selected_examples_file_title = st.selectbox(
+                            "Fichier d'exemples:",
+                            options=available_examples_title,
+                            key="examples_file_title",
+                            help="Choisissez le fichier d'exemples correspondant à votre projet"
+                        )
+                        
+                        max_examples_title = st.slider(
+                            "Nombre d'exemples max:",
+                            min_value=1,
+                            max_value=5,
+                            value=3,
+                            key="max_examples_title",
+                            help="Nombre maximum d'exemples à utiliser pour guider la génération par titre"
+                        )
+                        
+                        # Preview examples for title generation
+                        if st.checkbox("Aperçu des exemples", value=False, key="preview_examples_title"):
+                            examples_title = interface.examples_loader.get_examples_for_context(
+                                selected_examples_file_title, max_examples=max_examples_title
+                            )
+                            if examples_title:
+                                st.write(f"**📋 {len(examples_title)} exemple(s) trouvé(s):**")
+                                for i, ex in enumerate(examples_title, 1):
+                                    with st.expander(f"Exemple {i}: {ex.get('theme', 'N/A')}", expanded=False):
+                                        st.write(f"**Question:** {ex.get('question', '')}")
+                                        st.write(f"**Type:** {ex.get('type', 'N/A')} | **Difficulté:** {ex.get('difficulty', 'N/A')}")
+                                        options = ex.get('options', [])
+                                        if options:
+                                            st.write("**Options:**")
+                                            for opt in options[:2]:  # Show first 2 options
+                                                st.write(f"  - {opt}")
+                                            if len(options) > 2:
+                                                st.write(f"  ... et {len(options)-2} autres")
+                            else:
+                                st.warning("Aucun exemple trouvé dans ce fichier")
+                    else:
+                        selected_examples_file_title = None
+                        max_examples_title = 3
+                else:
+                    use_examples_title = False
+                    selected_examples_file_title = None  
+                    max_examples_title = 3
+                    st.info("💡 Aucun fichier d'exemples disponible. Créez des fichiers JSON dans `data/few_shot_examples/`")
+                
                 # Generate button
                 if st.button("🚀 Générer questions depuis titre", type="primary"):
                     # Show progress
@@ -2375,12 +2513,17 @@ def create_streamlit_interface():
                                     try:
                                         # Try with progress tracking if supported
                                         result = asyncio.run(title_generator.generate_questions_from_title(
-                                            criteria, config, session_id_param, progress_session_id=progress_session_id
+                                            criteria, config, session_id_param, 
+                                            progress_session_id=progress_session_id,
+                                            examples_file=selected_examples_file_title if use_examples_title else None,
+                                            max_examples=max_examples_title if use_examples_title else 3
                                         ))
                                     except TypeError:
                                         # Fallback without progress tracking
                                         result = asyncio.run(title_generator.generate_questions_from_title(
-                                            criteria, config, session_id_param
+                                            criteria, config, session_id_param,
+                                            examples_file=selected_examples_file_title if use_examples_title else None,
+                                            max_examples=max_examples_title if use_examples_title else 3
                                         ))
                                     
                                     questions_result[0] = result

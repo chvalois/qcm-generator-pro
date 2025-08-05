@@ -24,6 +24,19 @@ from src.services.progress_tracker import (
 )
 from src.services.question_deduplicator import get_question_deduplicator
 from src.services.question_diversity_enhancer import get_diversity_enhancer
+from src.services.langsmith_tracker import get_langsmith_tracker
+
+# LangSmith imports
+try:
+    from langsmith import traceable
+    LANGSMITH_AVAILABLE = True
+except ImportError:
+    # Fallback decorator
+    def traceable(name: str = None, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
+    LANGSMITH_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +67,7 @@ class QCMGenerator:
         self.workflow_manager = get_progressive_workflow_manager()
         self.deduplicator = get_question_deduplicator()
         self.diversity_enhancer = get_diversity_enhancer()
+        self.langsmith_tracker = get_langsmith_tracker()
         
         # Track generation diversity
         self.used_contexts: List[str] = []
@@ -65,20 +79,34 @@ class QCMGenerator:
         config: GenerationConfig,
         question_type: QuestionType,
         difficulty: Difficulty,
-        language: Language = Language.FR
+        language: Language = Language.FR,
+        examples_file: Optional[str] = None,
+        max_examples: int = 3
     ) -> str:
         """
         Create prompt for question generation.
         
         Delegates to QuestionPromptBuilder service.
         """
-        return self.prompt_builder.build_generation_prompt(
-            context=context,
-            config=config,
-            question_type=question_type,
-            difficulty=difficulty,
-            language=language
-        )
+        # Use Few-Shot Examples if provided
+        if examples_file:
+            return self.prompt_builder.build_generation_prompt_with_examples(
+                context=context,
+                config=config,
+                question_type=question_type,
+                difficulty=difficulty,
+                language=language,
+                examples_file=examples_file,
+                max_examples=max_examples
+            )
+        else:
+            return self.prompt_builder.build_generation_prompt(
+                context=context,
+                config=config,
+                question_type=question_type,
+                difficulty=difficulty,
+                language=language
+            )
         
     async def generate_single_question(
         self,
@@ -87,7 +115,9 @@ class QCMGenerator:
         document_ids: Optional[List[str]] = None,
         themes_filter: Optional[List[str]] = None,
         document_id: int = 1,
-        session_id: str = "default"
+        session_id: str = "default",
+        examples_file: Optional[str] = None,
+        max_examples: int = 3
     ) -> QuestionCreate:
         """
         Generate a single QCM question.
@@ -109,105 +139,170 @@ class QCMGenerator:
             QCMGenerationError: If generation fails
         """
         try:
+            import time
+            generation_start_time = time.time()
             logger.debug(f"Generating single question for topic: {topic}")
             
-            # Get context from RAG engine with diversity check
-            context = self._get_or_create_context(topic, document_ids, themes_filter, avoid_similar=True)
-            
-            # Select question parameters
-            question_type = self.selector.select_question_type(config)
-            difficulty = self.selector.select_difficulty(config)
-            
-            # Create generation prompt with diversity enhancement
-            base_prompt = self.create_question_generation_prompt(
-                context=context,
-                config=config,
-                question_type=question_type,
-                difficulty=difficulty,
-                language=config.language
-            )
-            
-            # Apply diversity enhancement based on topic usage
-            diversity_level = min(self.used_topics_count.get(topic, 0), 3)
-            prompt = self.diversity_enhancer.enhance_prompt_diversity(
-                base_prompt=base_prompt,
-                context=context,
-                config=config,
-                question_type=question_type,
-                difficulty=difficulty,
-                diversity_level=diversity_level
-            )
-            
-            # Generate question using LLM
-            try:
-                system_prompt = self.prompt_builder.build_system_prompt(config.language)
-                response = await self.llm_manager.generate_response(
-                    prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=config.temperature,
-                    max_tokens=config.max_tokens
-                )
-            except Exception as e:
-                logger.error(f"LLM generation failed for topic '{topic}': {e}")
-                raise QCMGenerationError(f"LLM generation failed: {e}")
-            
-            # Parse response into QuestionCreate object
-            question = self.parser.parse_llm_response(
-                response=response,
-                config=config,
-                document_id=document_id,
+            # Start LangSmith tracing
+            with self.langsmith_tracker.trace_qcm_generation(
                 session_id=session_id,
                 topic=topic,
-                prompt=prompt,
-                source_chunks=context.source_chunks,
-                context_confidence=context.confidence_score
-            )
-            
-            # Check for duplicates and regenerate if needed
-            if self.deduplicator.is_duplicate(question):
-                logger.warning(f"Duplicate question detected for topic: {topic}, regenerating...")
-                # Try once more with enhanced diversity
-                alternative_context = self._get_or_create_context(
-                    self._generate_alternative_topic(topic), 
-                    document_ids, 
-                    themes_filter, 
-                    avoid_similar=True
-                )
+                question_type="auto-select",  # Will be determined
+                difficulty="auto-select",    # Will be determined
+                examples_file=examples_file,
+                metadata={
+                    "document_ids": document_ids,
+                    "themes_filter": themes_filter
+                }
+            ) as langsmith_run_id:
                 
-                alternative_prompt = self.create_question_generation_prompt(
-                    context=alternative_context,
+                # Get context from RAG engine with diversity check
+                context = self._get_or_create_context(topic, document_ids, themes_filter, avoid_similar=True)
+                
+                # Select question parameters
+                question_type = self.selector.select_question_type(config)
+                difficulty = self.selector.select_difficulty(config)
+                
+                # Create generation prompt with diversity enhancement
+                base_prompt = self.create_question_generation_prompt(
+                    context=context,
                     config=config,
                     question_type=question_type,
                     difficulty=difficulty,
-                    language=config.language
+                    language=config.language,
+                    examples_file=examples_file,
+                    max_examples=max_examples
                 )
                 
+                # Apply diversity enhancement based on topic usage
+                diversity_level = min(self.used_topics_count.get(topic, 0), 3)
+                prompt = self.diversity_enhancer.enhance_prompt_diversity(
+                    base_prompt=base_prompt,
+                    context=context,
+                    config=config,
+                    question_type=question_type,
+                    difficulty=difficulty,
+                    diversity_level=diversity_level
+                )
+            
+                # Enrich prompt with Few-Shot context for LangSmith visibility
+                if examples_file:
+                    # Add Few-Shot context at the beginning of the prompt
+                    try:
+                        from .simple_examples_loader import get_examples_loader
+                        loader = get_examples_loader()
+                        examples = loader.get_examples_for_context(examples_file, max_examples=max_examples or 3)
+                        
+                        if examples:
+                            fewshot_header = f"\n=== FEW-SHOT EXAMPLES (File: {examples_file}, Count: {len(examples)}) ===\n\n"
+                            
+                            for i, ex in enumerate(examples, 1):
+                                fewshot_header += f"EXAMPLE {i}:\n"
+                                fewshot_header += f"Thème: {ex.get('theme', 'N/A')}\n"
+                                fewshot_header += f"Difficulté: {ex.get('difficulty', 'N/A')}\n"
+                                fewshot_header += f"Question: {ex.get('question', 'N/A')}\n"
+                                fewshot_header += f"Options: {ex.get('options', [])}\n"
+                                fewshot_header += f"Correct: {ex.get('correct', [])}\n"
+                                fewshot_header += f"Explication: {ex.get('explanation', 'N/A')}\n\n"
+                            
+                            fewshot_header += "=== END EXAMPLES ===\n\n"
+                            fewshot_header += "Utilisez ces exemples comme guide pour générer une question similaire:\n\n"
+                            
+                            # Prepend to the existing prompt
+                            prompt = fewshot_header + prompt
+                            
+                    except Exception as e:
+                        logger.warning(f"Could not load Few-Shot examples: {e}")
+
+                # Generate question using LLM
                 try:
                     system_prompt = self.prompt_builder.build_system_prompt(config.language)
-                    alternative_response = await self.llm_manager.generate_response(
-                        prompt=alternative_prompt,
+                    response = await self.llm_manager.generate_response(
+                        prompt=prompt,
                         system_prompt=system_prompt,
-                        temperature=min(config.temperature + 0.3, 1.0),  # Increase creativity
-                        max_tokens=config.max_tokens
-                    )
-                    
-                    question = self.parser.parse_llm_response(
-                        response=alternative_response,
-                        config=config,
-                        document_id=document_id,
-                        session_id=session_id,
-                        topic=f"{topic} (alternative)",
-                        prompt=alternative_prompt,
-                        source_chunks=alternative_context.source_chunks,
-                        context_confidence=alternative_context.confidence_score
+                        temperature=config.temperature,
+                        max_tokens=config.max_tokens,
+                        langsmith_run_id=langsmith_run_id,
+                        # LangSmith metadata
+                        examples_file=examples_file,
+                        max_examples=max_examples,
+                        topic=topic,
+                        question_type=question_type.value if question_type else None,
+                        difficulty=difficulty.value if difficulty else None
                     )
                 except Exception as e:
-                    logger.warning(f"Alternative generation failed: {e}, using original question")
-            
-            # Add question to deduplicator tracking
-            self.deduplicator.add_question(question)
-            
-            return question
+                    logger.error(f"LLM generation failed for topic '{topic}': {e}")
+                    raise QCMGenerationError(f"LLM generation failed: {e}")
+                
+                # Parse response into QuestionCreate object
+                question = self.parser.parse_llm_response(
+                    response=response,
+                    config=config,
+                    document_id=document_id,
+                    session_id=session_id,
+                    topic=topic,
+                    prompt=prompt,
+                    source_chunks=context.source_chunks,
+                    context_confidence=context.confidence_score
+                )
+                
+                # Check for duplicates and regenerate if needed
+                if self.deduplicator.is_duplicate(question):
+                    logger.warning(f"Duplicate question detected for topic: {topic}, regenerating...")
+                    # Try once more with enhanced diversity
+                    alternative_context = self._get_or_create_context(
+                        self._generate_alternative_topic(topic), 
+                        document_ids, 
+                        themes_filter, 
+                        avoid_similar=True
+                    )
+                    
+                    alternative_prompt = self.create_question_generation_prompt(
+                        context=alternative_context,
+                        config=config,
+                        question_type=question_type,
+                        difficulty=difficulty,
+                        language=config.language,
+                        examples_file=examples_file,
+                        max_examples=max_examples
+                    )
+                    
+                    try:
+                        system_prompt = self.prompt_builder.build_system_prompt(config.language)
+                        alternative_response = await self.llm_manager.generate_response(
+                            prompt=alternative_prompt,
+                            system_prompt=system_prompt,
+                            temperature=min(config.temperature + 0.3, 1.0),  # Increase creativity
+                            max_tokens=config.max_tokens,
+                            # LangSmith metadata
+                            examples_file=examples_file,
+                            max_examples=max_examples,
+                            topic=f"{topic} (alternative)",
+                            question_type=question_type.value if question_type else None,
+                            difficulty=difficulty.value if difficulty else None
+                        )
+                        
+                        question = self.parser.parse_llm_response(
+                            response=alternative_response,
+                            config=config,
+                            document_id=document_id,
+                            session_id=session_id,
+                            topic=f"{topic} (alternative)",
+                            prompt=alternative_prompt,
+                            source_chunks=alternative_context.source_chunks,
+                            context_confidence=alternative_context.confidence_score
+                        )
+                    except Exception as e:
+                        logger.warning(f"Alternative generation failed: {e}, using original question")
+                
+                # Add question to deduplicator tracking
+                self.deduplicator.add_question(question)
+                
+                # Log generation success (LangSmith tracing is handled by @traceable decorator)
+                generation_time = time.time() - generation_start_time
+                logger.info(f"Question generated successfully in {generation_time:.2f}s for topic: {topic}")
+                
+                return question
             
         except Exception as e:
             logger.error(f"Failed to generate question for topic '{topic}': {e}")
@@ -344,7 +439,9 @@ class QCMGenerator:
         themes_filter: Optional[List[str]] = None,
         batch_size: int = 5,
         session_id: str = "default",
-        progress_session_id: Optional[str] = None
+        progress_session_id: Optional[str] = None,
+        examples_file: Optional[str] = None,
+        max_examples: int = 3
     ) -> List[QuestionCreate]:
         """
         Generate a batch of questions.
@@ -385,7 +482,9 @@ class QCMGenerator:
                     document_ids=document_ids,
                     themes_filter=themes_filter,
                     document_id=document_id,
-                    session_id=session_id
+                    session_id=session_id,
+                    examples_file=examples_file,
+                    max_examples=max_examples
                 )
                 questions.append(question)
                 
@@ -552,12 +651,15 @@ async def generate_qcm_question(
     document_ids: Optional[List[str]] = None,
     themes_filter: Optional[List[str]] = None,
     document_id: int = 1,
-    session_id: str = "default"
+    session_id: str = "default",
+    examples_file: Optional[str] = None,
+    max_examples: int = 3
 ) -> QuestionCreate:
     """Generate a single QCM question."""
     generator = get_qcm_generator()
     return await generator.generate_single_question(
-        topic, config, document_ids, themes_filter, document_id, session_id
+        topic, config, document_ids, themes_filter, document_id, session_id,
+        examples_file, max_examples
     )
 
 

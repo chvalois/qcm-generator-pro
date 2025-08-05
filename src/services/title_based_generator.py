@@ -194,7 +194,9 @@ class TitleBasedQCMGenerator:
         criteria: TitleSelectionCriteria,
         config: GenerationConfig,
         session_id: Optional[str] = None,
-        progress_session_id: Optional[str] = None
+        progress_session_id: Optional[str] = None,
+        examples_file: Optional[str] = None,
+        max_examples: int = 3
     ) -> List[QuestionCreate]:
         """
         Generate QCM questions from chunks matching the title criteria.
@@ -260,7 +262,9 @@ class TitleBasedQCMGenerator:
                         topic=topic,
                         config=config,
                         document_ids=[temp_doc_id],
-                        session_id=session_id or f"title_gen_{abs(hash(topic)) % 10000}"
+                        session_id=session_id or f"title_gen_{abs(hash(topic)) % 10000}",
+                        examples_file=examples_file,
+                        max_examples=max_examples
                     )
                     
                     # Add title-specific metadata

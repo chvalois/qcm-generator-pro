@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # QCM Generator Pro - Local Edition
 ## Project Context for Claude Code
 
@@ -7,12 +11,12 @@ This document provides comprehensive context for developing the QCM Generator Pr
 
 To Do Next
 
-- Corriger problème Module 1 et Unité 1 n'apparaissent pas dans les Titres H2 et H3
+- Ajouter des exemples de questions attendues + orienter vers des questions plus "hands-on" => tester si o3 c'est mieux
+- Cleaner le .env 
 - Espaces en trop dans les mots lorsque PDF avec polices trop larges
 - Tester LangChain + pyMuPDF (unstructured trop cher) pour le découpage des chunks + Ragas pour l'évaluation
 - Regarder du côté de : https://github.com/huridocs/pdf-document-layout-analysis
 - Redécouper Streamlit app (1200 lignes +)
-- Ajouter des exemples de questions attendues + orienter vers des questions plus "hands-on" => tester si o3 c'est mieux
 - Faire fonctionner avec Docker
 - Faire fonctionner en local sur RTX 4090 avec Ollama
 - Améliorer tests
@@ -288,35 +292,50 @@ class GenerationConfig(BaseModel):
 
 ---
 
-## 🔧 Core Services
+## 🔧 Core Services Architecture
 
-### Theme Extractor Service
-- **Purpose**: Automatic theme extraction from PDF documents
-- **Features**: Structural analysis + content clustering
-- **Technologies**: spaCy, scikit-learn TF-IDF, KMeans clustering
-- **Output**: ThemeDetection objects with confidence scores
+### Service Layer Overview
+The application follows a clean service-oriented architecture with clear separation of concerns:
 
-### RAG Engine Service
-- **Purpose**: Retrieval-Augmented Generation for question context
-- **Vector Store**: ChromaDB for local embeddings
-- **Embedding Model**: sentence-transformers/all-MiniLM-L6-v2
-- **Features**: Theme-filtered similarity search, chunk retrieval
+**Core Services (`src/services/`):**
+- `llm_manager.py` - Multi-provider LLM integration (OpenAI, Anthropic, Ollama) with LangSmith tracking
+- `rag_engine.py` - ChromaDB vector store with semantic search
+- `qcm_generator.py` - Main question generation logic with progressive workflow
+- `pdf_processor.py` - PDF text extraction and document chunking
+- `theme_extractor.py` - LLM-based theme detection with fallback mechanisms
+- `validator.py` - Question structure and content validation
+- `progressive_workflow.py` - 1→5→all generation workflow management
 
-### Progressive QCM Generator
-- **Workflow**: 1 question → 5 questions → all remaining
-- **Validation**: Automatic + manual approval points
-- **Features**: Theme distribution, difficulty balancing, duplicate prevention
+**Specialized Generators:**
+- `title_based_generator.py` - Title-specific question generation
+- `chunk_based_generator.py` - Chunk-based question generation
+- `enhanced_qcm_generator.py` - Enhanced generation with diversity controls
 
-### Question Validator
-- **Structure Validation**: Options count (3-6), correct answers format
-- **Content Validation**: Question clarity, distractor quality
-- **Linguistic Validation**: Language consistency, grammar check
+**Supporting Services:**
+- `question_prompt_builder.py` - Dynamic prompt construction with few-shot examples
+- `simple_examples_loader.py` - Few-shot example management
+- `langsmith_tracker.py` - LangSmith integration for LLM call tracking
+- `document_manager.py` - Document lifecycle management
+- `progress_tracker.py` - Real-time progress tracking
 
-### LLM Manager
-- **Local Models**: Mistral-7B, Llama3-8B, Phi-3 (RTX 4090 optimized)
-- **Cloud APIs**: OpenAI, Anthropic (optional)
-- **Ollama Integration**: Local model serving
-- **Features**: Model switching, performance monitoring
+### Key Architectural Patterns
+
+**Progressive Generation Workflow:**
+1. **Initial Test** (1 question) → user validation
+2. **Small Batch** (5 questions) → manual review
+3. **Full Generation** → automated completion
+4. **Continuous Validation** at each step
+
+**Multi-Provider LLM Support:**
+- **Default**: `gpt-4o-mini` (OpenAI) for cost-effectiveness
+- **High Quality**: `gpt-4o` for complex questions
+- **Local**: Ollama integration for on-premise deployment
+- **Fallback Chain**: Automatic provider switching on failures
+
+**RAG-Enhanced Generation:**
+- ChromaDB vector store with semantic similarity search
+- Context-aware question generation using document chunks
+- Theme-filtered retrieval for targeted question generation
 
 ---
 
@@ -381,33 +400,54 @@ tests/integration/
 
 ## 🚀 Development Commands
 
-### Makefile Commands
+### Essential Development Commands
+
+**Setup & Environment:**
 ```bash
-# Development
-make install-dev      # Install dependencies + pre-commit
-make run              # Start FastAPI server
-make run-ui           # Start Streamlit interface
-make setup-models     # Download local LLM models
+make dev-setup        # Full development environment setup (install + dirs + db)
+make install-dev      # Install dependencies + pre-commit hooks
+```
 
-# Testing
-make test             # Run all tests
-make test-unit        # Unit tests only
-make test-cov         # Tests with coverage report
+**Running the Application:**
+```bash
+make run-app          # Start complete app (API + UI) - RECOMMENDED
+make run-app-debug    # Start complete app in debug mode
+make run              # Start FastAPI server only
+make run-ui           # Start Streamlit interface only
+make check-setup      # Verify development setup
+```
 
-# Code Quality
+**Testing (26 tests, all passing):**
+```bash
+make test-working     # Run core working tests (21 tests) - RECOMMENDED
+make test-basic       # Run basic functionality tests (6 tests)
+make test             # Run all tests with coverage
+make test-simple      # Run all tests without coverage
+```
+
+**Code Quality:**
+```bash
+make format           # Format code (black + ruff)
 make lint             # Run linting (ruff + mypy)
-make format           # Format code (black + isort)
+make quick-check      # Fast development check (format + lint + fast tests)
+make full-check       # Complete development check (format + lint + all tests)
+```
 
-# Database
+**Database Management:**
+```bash
 make db-init          # Initialize database
-make db-reset         # Reset database
+make db-reset         # Reset database completely
+make db-migrate       # Run database migrations
+```
 
-# Docker
-make docker-build     # Build container
-make docker-run       # Run containerized app (GPU)
-make docker-run-cpu   # Run containerized app (CPU)
-make docker-logs      # View container logs
-make docker-shell     # Shell access to container
+**Docker Deployment:**
+```bash
+make docker-run       # Run containerized app (GPU-enabled)
+make docker-run-cpu   # Run containerized app (CPU-only)
+make docker-logs      # View all container logs
+make docker-shell     # Shell access to main container
+make docker-health    # Check container health status
+make docker-clean     # Clean Docker resources
 ```
 
 ---
@@ -497,29 +537,50 @@ repos:
 
 ## 🎯 Key Implementation Notes
 
-### Progressive Generation Workflow
-1. **Initial Test**: Generate 1 question for validation
-2. **Small Batch**: Generate 5 questions, manual review
-3. **Full Generation**: Generate remaining questions automatically
-4. **Quality Control**: Continuous validation at each step
+### Current Branch: `questions_fewshots`
+This branch focuses on few-shot learning integration and question quality improvements.
 
-### Theme-Based Question Distribution
-- Extract themes automatically from PDF structure
-- Balance questions across identified themes
-- Ensure comprehensive content coverage
-- Support manual theme filtering
+**Recent Changes:**
+- Added `simple_examples_loader.py` for few-shot example management
+- Implemented `langsmith_tracker.py` for LLM call tracking and monitoring
+- Enhanced question generation with few-shot examples from `data/few_shot_examples/`
+- Updated LLM manager to support LangSmith integration
 
-### Export Format (Udemy CSV)
+### Few-Shot Learning Integration
+- **Examples Storage**: `data/few_shot_examples/` contains JSON files with domain-specific examples
+- **Dynamic Loading**: `simple_examples_loader.py` loads examples based on document content
+- **Prompt Enhancement**: Examples are integrated into prompts for better question quality
+- **Tracking**: LangSmith tracks example usage and effectiveness
+
+### Quality Validation Pipeline
+1. **Structure Validation**: JSON parsing, option count (3-6), correct answer format
+2. **Content Validation**: Question clarity, option diversity, explanation quality
+3. **Deduplication**: Prevent similar questions using semantic similarity
+4. **Language Consistency**: Maintain consistent language throughout questions
+
+### Export Formats
+**Udemy CSV Format:**
 ```csv
 question,answer_1,answer_2,answer_3,answer_4,correct_answer,explanation
-"Qu'est-ce que Python?","Un serpent","Un langage","Un fruit","Un outil","2","Python est un langage de programmation..."
+"What is Python?","A snake","A programming language","A fruit","A tool","2","Python is a programming language..."
 ```
 
-### Local LLM Optimization (RTX 4090)
-- **Recommended**: Mistral-7B for speed/quality balance
-- **High Quality**: Llama3-8B for complex questions
-- **Ultra Fast**: Phi-3 for rapid iteration
-- **GPU Memory**: Full 24GB VRAM utilization
+**JSON Format (with metadata):**
+```json
+{
+  "question": "What is Python?",
+  "options": ["A snake", "A programming language", "A fruit", "A tool"],
+  "correct_answers": [1],
+  "explanation": "Python is a programming language...",
+  "metadata": {"theme": "Programming", "difficulty": "easy"}
+}
+```
+
+### Environment Configuration
+- **Primary LLM**: OpenAI GPT-4o-mini (cost-effective default)
+- **Database**: SQLite with ChromaDB vector store
+- **Few-Shot Examples**: JSON files in `data/few_shot_examples/`
+- **LangSmith**: Optional tracking for production monitoring
 
 ---
 
@@ -646,57 +707,36 @@ pytest tests/unit/test_theme_extractor.py -v -s
 
 ---
 
-## 🔄 Next Steps - UI Migration
+## 🔄 Development Workflow
 
-### Phase 7: Streamlit to Streamlit Migration (PRIORITY)
+### Quick Start for New Features
+1. **Create todo list** using TodoWrite tool for complex tasks
+2. **Branch from current**: Base work on `questions_fewshots` branch
+3. **Run setup check**: `make check-setup` to verify environment
+4. **Test existing functionality**: `make test-working` (21 tests should pass)
+5. **Implement changes** following service-oriented architecture
+6. **Validate changes**: Run `make quick-check` for fast validation
+7. **Full validation**: Run `make full-check` before commits
 
-**Issue**: Streamlit has persistent compatibility issues in Docker environments due to JSON schema bugs that affect complex interfaces.
+### Code Modification Guidelines
+- **Service Layer**: Add new functionality to appropriate service in `src/services/`
+- **API Endpoints**: Add routes to appropriate module in `src/api/routes/`
+- **Database Changes**: Update models in `src/models/database.py` and schemas in `src/models/schemas.py`
+- **Configuration**: Add settings to `src/core/config.py` with environment variable support
+- **UI Changes**: Modify `src/ui/streamlit_app.py` (currently 1200+ lines, needs refactoring)
 
-**Solution**: Complete migration from Streamlit to Streamlit for a more stable and Docker-compatible UI framework.
+### Testing Strategy
+- **Unit Tests**: Focus on individual service functionality
+- **Integration Tests**: Test complete workflows (PDF → QCM generation → Export)
+- **Test Data**: Use fixtures in `tests/fixtures/` and `data/few_shot_examples/`
+- **Coverage**: Maintain >90% coverage for core services
 
-#### Migration Tasks:
-
-1. **Remove Streamlit Dependencies**
-   - Remove all Streamlit imports and references from codebase
-   - Update requirements.txt to remove Streamlit and add Streamlit
-   - Clean up Streamlit-specific configurations
-
-2. **Create Streamlit Interface**
-   - Design new Streamlit UI structure matching current functionality
-   - Implement document upload interface
-   - Create QCM generation workflow (1→5→all progression)
-   - Build export functionality interface
-   - Add system monitoring dashboard
-
-3. **Update Docker Configuration**
-   - Modify docker_start.py to launch Streamlit instead of Streamlit
-   - Update port configurations (Streamlit default: 8501)
-   - Test Docker compatibility
-
-4. **Code Migration Strategy**
-   - Replace `src/ui/streamlit_app.py` with `src/ui/streamlit_app.py`
-   - Convert Streamlit components to Streamlit equivalents:
-     - `gr.File` → `st.file_uploader`
-     - `gr.Button` → `st.button`
-     - `gr.Textbox` → `st.text_input`/`st.text_area`
-     - `gr.Slider` → `st.slider`
-     - `gr.Dropdown` → `st.selectbox`
-     - `gr.CheckboxGroup` → `st.multiselect`
-     - `gr.Progress` → `st.progress`
-     - `gr.Tabs` → `st.tabs`
-
-5. **Benefits of Streamlit Migration**
-   - Better Docker compatibility
-   - More intuitive state management
-   - Easier component handling
-   - Better error handling
-   - Cleaner code structure
-   - More robust in production environments
-
-#### Implementation Priority:
-- **High Priority**: This migration resolves the Docker UI accessibility issue
-- **Timeline**: Should be completed before any major deployments
-- **Impact**: Improves user experience and deployment reliability
+### Current Priorities (from To Do List)
+1. **Question Quality**: Integrate more sophisticated few-shot examples and improve "hands-on" question generation
+2. **Code Refactoring**: Split large Streamlit app into smaller components
+3. **Performance**: Optimize PDF processing for documents with wide fonts/spacing issues
+4. **Architecture**: Implement Clean Architecture with SOLID principles
+5. **Testing**: Expand test coverage and improve integration tests
 
 ---
 
