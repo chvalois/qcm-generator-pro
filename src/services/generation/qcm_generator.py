@@ -189,9 +189,11 @@ class QCMGenerator:
                 if examples_file:
                     # Add Few-Shot context at the beginning of the prompt
                     try:
-                        from .simple_examples_loader import get_examples_loader
+                        from src.services.llm.simple_examples_loader import get_examples_loader
                         loader = get_examples_loader()
-                        examples = loader.get_examples_for_context(examples_file, max_examples=max_examples or 3)
+                        # Add .json extension if not present
+                        examples_file_with_ext = examples_file if examples_file.endswith('.json') else f"{examples_file}.json"
+                        examples = loader.get_examples_for_context(examples_file_with_ext, max_examples=max_examples or 3)
                         
                         if examples:
                             fewshot_header = f"\n=== FEW-SHOT EXAMPLES (File: {examples_file}, Count: {len(examples)}) ===\n\n"

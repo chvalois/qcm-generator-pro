@@ -1,0 +1,28 @@
+[client]
+showErrorDetails = false
+toolbarMode = "minimal"
+
+[server]
+enableCORS = false
+enableXsrfProtection = true
+runOnSave = false
+
+[ui]
+hideTopBar = true
+
+[browser]
+gatherUsageStats = false
+
+[logger]
+level = "error"
+
+[theme]
+base = "light"
+
+# Disable automatic page discovery
+[global]
+developmentMode = false
+
+# Force single page mode
+[runner]
+magicEnabled = false

@@ -275,7 +275,7 @@ python -c "from src.models.database import init_database; init_database()"
 # Lancer l'interface Streamlit
 make run-ui
 # ou
-streamlit run src/ui/streamlit_app.py
+streamlit run main_app.py
 ```
 
 Ouvrez http://localhost:8501 dans votre navigateur.

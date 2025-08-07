@@ -11,7 +11,8 @@ help:
 	@echo "Development Commands:"
 	@echo "  install-dev     Install dependencies + pre-commit hooks"
 	@echo "  run             Start FastAPI server"
-	@echo "  run-ui          Start Streamlit interface"
+	@echo "  run-ui          Start Streamlit interface (main entry point)"
+	@echo "  run-ui-clean    Start Streamlit interface (clean mode, no page navigation)"
 	@echo "  run-app         Start complete app (API + UI)"
 	@echo "  run-app-debug   Start complete app in debug mode"
 	@echo "  run-api-only    Start FastAPI backend only"
@@ -67,8 +68,12 @@ run:
 	uvicorn src.api.main:app --reload --host 127.0.0.1 --port 8001
 
 run-ui:
-	@echo "🚀 Starting Streamlit interface..."
-	python -m streamlit run src/ui/streamlit_app.py
+	@echo "🚀 Starting Streamlit interface (main entry point)..."
+	python -m streamlit run main_app.py
+
+run-ui-clean:
+	@echo "🚀 Starting Streamlit interface (clean mode)..."
+	python -m streamlit run main_app.py --server.headless=true --browser.gatherUsageStats=false
 
 run-app:
 	@echo "🚀 Starting complete QCM Generator Pro (API + UI)..."
@@ -367,7 +372,7 @@ debug:
 
 debug-ui:
 	@echo "🐛 Starting UI debug mode..."
-	python -m debugpy --listen 5679 --wait-for-client -m streamlit run src/ui/streamlit_app.py
+	python -m debugpy --listen 5679 --wait-for-client -m streamlit run main_app.py
 
 # ============================================================================
 # Model Management

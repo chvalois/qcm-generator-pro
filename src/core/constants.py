@@ -348,8 +348,8 @@ ERROR_MESSAGES = {
 
 # Development settings
 DEV_RELOAD = True
-DEV_DEBUG = True
-DEV_LOG_LEVEL = "DEBUG"
+DEV_DEBUG = False
+DEV_LOG_LEVEL = "INFO"
 
 # Production settings
 PROD_RELOAD = False

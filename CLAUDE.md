@@ -16,11 +16,51 @@ To Do Next
 - Mis à jour 50+ imports dans toute la codebase
 - Structure claire : document/, generation/, quality/, llm/, infrastructure/
 
-**NEXT PRIORITIES:**
-- Cleaner l'architecture Streamlit en components (Phase 2 - prêt à démarrer)
-- Passer à du React à terme pour remplacer Streamlit
-- Améliorer tests avec la nouvelle architecture
+✅ **COMPLETED** - Component-Based UI Architecture (January 2025)
+- Interface Streamlit réorganisée en composants réutilisables (95% réduction de taille : 2992 → 146 lignes)
+- Architecture prête pour migration React avec séparation claire des responsabilités
+- Composants modulaires : pages, common, core avec InterfaceManager central
+- Gestion manuelle des modèles Ollama (désactivation téléchargement automatique)
 
+**NEXT PRIORITIES:**
+- Passer à du React à terme pour remplacer Streamlit
+- Améliorer tests avec la nouvelle architecture de composants
+- Améliorer la détection automatique de titres et le découpage en chunks intelligents (par ex, dans le cas de slides, le titre est en haut, et le chunk contient l'ensemble de la slide)
+- Implémenter les fonctionnalités réelles de téléchargement des modèles Ollama via l'interface
+
+---
+
+## 🦙 Gestion des Modèles Ollama
+
+### Téléchargement Manuel (Nouvelle Fonctionnalité)
+
+**Changement Important :** Le téléchargement automatique des modèles Ollama au démarrage a été **désactivé par défaut** pour éviter les téléchargements non souhaités.
+
+#### **Configuration :**
+```bash
+# Variable d'environnement pour contrôler le téléchargement automatique
+OLLAMA_AUTO_DOWNLOAD_MODELS=false  # Désactivé par défaut
+```
+
+#### **Interface de Téléchargement Manuel :**
+Accessible via **Système → Gestion des modèles Ollama** dans l'interface Streamlit :
+
+- ✅ **Modèles Recommandés** : Boutons de téléchargement pour `mistral:7b-instruct`, `llama3:8b-instruct`, `phi3:mini`
+- ✅ **Téléchargement Personnalisé** : Champ de saisie pour télécharger n'importe quel modèle Ollama
+- ✅ **Statut des Modèles** : Indication visuelle des modèles installés/non installés
+- ✅ **Gestion d'Erreurs** : Messages d'erreur clairs en cas d'échec
+
+#### **Réactivation du Téléchargement Automatique :**
+Pour réactiver le téléchargement automatique, modifiez :
+```bash
+# Dans docker-compose.yml ou .env.docker
+OLLAMA_AUTO_DOWNLOAD_MODELS=true
+```
+
+#### **Avantages :**
+- 🚀 **Démarrage Plus Rapide** : L'app démarre immédiatement sans attendre les téléchargements
+- 💾 **Contrôle de l'Espace Disque** : Téléchargez uniquement les modèles nécessaires
+- 🎯 **Expérience Utilisateur** : Choisissez quels modèles installer selon vos besoins
 
 ---
 
