@@ -22,8 +22,14 @@ To Do Next
 - Composants modulaires : pages, common, core avec InterfaceManager central
 - Gestion manuelle des modèles Ollama (désactivation téléchargement automatique)
 
+**CURRENT FOCUS: React Migration (January 2025)**
+- 🚀 **React Migration en cours** : Transition de Streamlit vers React/TypeScript avec Shadcn/ui
+- 🎭 **Tests Playwright configurés** : Comparaison automatisée des interfaces Streamlit vs React
+- 🔄 **Migration progressive** : Maintien des deux interfaces en parallèle pendant la transition
+- 📱 **UX moderne** : Interface responsive avec composants Shadcn/ui et TanStack Query
+
 **NEXT PRIORITIES:**
-- Passer à du React à terme pour remplacer Streamlit
+- Finaliser la migration React complète (12 semaines planifiées)
 - Améliorer tests avec la nouvelle architecture de composants
 - Améliorer la détection automatique de titres et le découpage en chunks intelligents (par ex, dans le cas de slides, le titre est en haut, et le chunk contient l'ensemble de la slide)
 - Implémenter les fonctionnalités réelles de téléchargement des modèles Ollama via l'interface
@@ -808,6 +814,95 @@ pytest tests/unit/test_theme_extractor.py -v -s
 - `docker_setup.py`: Automated Docker deployment setup and configuration
 - `docker_start.py`: Container startup orchestration with health monitoring
 - Docker compose files for GPU and CPU deployment scenarios
+
+---
+
+## 🚀 **REACT MIGRATION PLAN** *(Janvier 2025)*
+
+### Phase 1: API Layer Enhancement (Semaines 1-2)
+**Objectifs :**
+- Améliorer les endpoints FastAPI pour React
+- Ajouter WebSocket pour suivi temps réel
+- Configuration CORS pour frontend React
+
+**Nouvelles API nécessaires :**
+```python
+# Real-time progress WebSocket
+@router.websocket("/ws/progress/{session_id}")
+async def progress_websocket(websocket: WebSocket, session_id: str)
+
+# Document chunk preview pour React
+@router.get("/documents/{doc_id}/chunks") 
+async def get_document_chunks(doc_id: int)
+
+# Theme-based generation
+@router.post("/generation/by-theme")
+async def generate_by_theme(theme_config: ThemeGenerationConfig)
+```
+
+### Phase 2: React Frontend Development (Semaines 3-6)
+**Structure Frontend :**
+```
+frontend/
+├── src/
+│   ├── components/ui/         # Shadcn/ui components
+│   ├── components/documents/  # Document management
+│   ├── components/generation/ # QCM generation
+│   ├── pages/                 # Pages React Router
+│   ├── hooks/                 # Custom React hooks
+│   ├── lib/                   # API client (TanStack Query)
+│   └── types/                 # TypeScript definitions
+```
+
+**Technologies :**
+- React 18 + TypeScript
+- Shadcn/ui components (design system moderne)
+- TanStack Query (state management API)
+- React Router (navigation)
+- WebSocket (temps réel)
+
+### Phase 3: Component Migration (Semaines 7-10)
+**Composants prioritaires :**
+1. **DocumentUpload** : Upload + configuration chunking
+2. **ProgressiveGenerator** : Workflow 1→5→all questions
+3. **DocumentDisplay** : Visualisation chunks et thèmes
+4. **ExportInterface** : Export CSV/JSON avec téléchargement
+
+**Avantages Architecture Clean :**
+- Services `src/services/` → API business logic
+- Logique métier déjà séparée de l'UI
+- Réutilisation des services existants via API
+
+### Phase 4: Integration & Deployment (Semaines 11-12)
+**Docker Configuration :**
+```yaml
+services:
+  backend:    # FastAPI existant (inchangé)
+  frontend:   # Nouveau service React
+    ports: ["3000:3000"]
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+  ollama:     # Services existants (inchangés)
+  redis:      # Services existants (inchangés)
+```
+
+**Migration Progressive :**
+- Streamlit (:8501) et React (:3000) en parallèle
+- Tests Playwright pour validation comparative
+- Transition graduelle sans interruption de service
+
+### Avantages de la Migration
+✅ **UX Moderne** : Interface responsive, animations fluides
+✅ **Performance** : Rendu côté client, lazy loading, optimisations
+✅ **Maintenance** : TypeScript, composants modulaires, tests automatisés
+✅ **Évolutivité** : Ecosystem React mature, extensions faciles
+✅ **Temps Réel** : WebSocket natif vs polling Streamlit
+
+### Tests Playwright
+- **Comparaison Visuelle** : Screenshots automatiques Streamlit vs React
+- **Tests Fonctionnels** : Validation parité features entre interfaces
+- **Tests Performance** : Mesure temps de chargement et réactivité
+- **Tests d'Intégration** : Workflows complets upload→génération→export
 
 **Remaining Optional Tasks**: 
 - ⏳ Enhanced multilingual prompt templates (currently basic FR/EN support)

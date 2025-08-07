@@ -1,0 +1,23 @@
+# Playwright generated files
+screenshots/
+videos/
+reports/
+test-results/
+
+# Pytest cache
+.pytest_cache/
+__pycache__/
+
+# Playwright browsers (if installed locally)
+ms-playwright/
+
+# HTML reports
+*.html
+*.xml
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+.DS_Store

@@ -399,3 +399,42 @@ security-check:
 	safety check
 	bandit -r src/
 	@echo "✅ Security check complete!"
+
+# ============================================================================
+# Playwright Testing Commands
+# ============================================================================
+
+test-playwright-install:	## Install Playwright dependencies
+	@echo "🎭 Installing Playwright dependencies..."
+	uv pip install -r tests/playwright/requirements.txt
+	python -m playwright install chromium
+	@echo "✅ Playwright installed successfully"
+
+test-playwright-baseline:	## Run Streamlit baseline tests
+	@echo "🎭 Running Streamlit baseline tests..."
+	python tests/playwright/run_tests.py baseline --headed
+	@echo "✅ Baseline tests completed"
+
+test-playwright-comparison:	## Run interface comparison tests
+	@echo "🎭 Running interface comparison tests..."
+	python tests/playwright/run_tests.py comparison --headed
+	@echo "✅ Comparison tests completed"
+
+test-playwright-all:	## Run all Playwright tests
+	@echo "🎭 Running all Playwright tests..."
+	python tests/playwright/run_tests.py all
+	@echo "✅ All Playwright tests completed"
+
+test-playwright-report:	## Generate comparison report
+	@echo "🎭 Generating comparison report..."
+	python tests/playwright/run_tests.py report
+	@echo "📊 Comparison report generated"
+
+test-playwright-clean:	## Clean Playwright artifacts
+	@echo "🎭 Cleaning Playwright artifacts..."
+	python tests/playwright/run_tests.py clean
+	@echo "🧹 Playwright artifacts cleaned"
+
+test-playwright-services:	## Check if services are running
+	@echo "🎭 Checking services status..."
+	python tests/playwright/run_tests.py check-services
