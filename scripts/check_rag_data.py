@@ -12,7 +12,7 @@ sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
 
 import json
-from src.services.rag_engine import SimpleRAGEngine, get_rag_engine
+from src.services.infrastructure.rag_engine import SimpleRAGEngine, get_rag_engine
 
 
 def check_rag_data():

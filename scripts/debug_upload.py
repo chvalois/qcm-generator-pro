@@ -13,7 +13,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
 
-from src.services.document_manager import get_document_manager, process_and_store_pdf
+from src.services.document.document_manager import get_document_manager, process_and_store_pdf
 from src.core.config import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -98,7 +98,7 @@ async def test_document_upload():
             print(f"   • {theme.theme_name} (confidence: {theme.confidence_score:.2f})")
         
         # Test RAG engine integration
-        from src.services.rag_engine import get_rag_engine
+        from src.services.infrastructure.rag_engine import get_rag_engine
         rag_engine = get_rag_engine()
         
         if hasattr(rag_engine, 'get_collection_stats'):

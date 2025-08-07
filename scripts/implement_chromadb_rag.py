@@ -218,7 +218,7 @@ def migrate_simple_to_chromadb():
     
     try:
         # Import current RAG engine
-        from src.services.rag_engine import get_rag_engine
+        from src.services.infrastructure.rag_engine import get_rag_engine
         
         simple_rag = get_rag_engine()
         

@@ -1,0 +1,4 @@
+# Disable automatic page discovery
+[pages]
+# Force single page mode - no automatic pages
+auto_discovery = false

@@ -123,7 +123,7 @@ class DockerStartupManager:
         
         cmd = [
             "streamlit", "run",
-            "src/ui/streamlit_app.py",
+            "main_app.py",
             "--server.address", ui_host,
             "--server.port", ui_port,
             "--server.headless", "true",

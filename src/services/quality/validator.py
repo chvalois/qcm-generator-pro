@@ -9,8 +9,8 @@ import logging
 import re
 from typing import Any
 
-from ..models.enums import QuestionType, ValidationStatus
-from ..models.schemas import QuestionCreate, ValidationResult
+from src.models.enums import QuestionType, ValidationStatus
+from src.models.schemas import QuestionCreate, ValidationResult
 
 logger = logging.getLogger(__name__)
 

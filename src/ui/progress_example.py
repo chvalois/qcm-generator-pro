@@ -10,11 +10,11 @@ import asyncio
 import time
 from typing import Optional
 
-from src.services.enhanced_qcm_generator import EnhancedQCMGenerator, GenerationMode
+from src.services.generation.enhanced_qcm_generator import EnhancedQCMGenerator, GenerationMode
 from src.models.schemas import GenerationConfig
 from src.models.enums import Language, Difficulty, QuestionType
 from src.ui.progress_components import ProgressDisplay, ProgressSidebar, show_progress_metrics
-from src.services.progress_tracker import get_progress_tracker, ProgressStatus
+from src.services.infrastructure.progress_tracker import get_progress_tracker, ProgressStatus
 
 
 def example_generation_with_progress():

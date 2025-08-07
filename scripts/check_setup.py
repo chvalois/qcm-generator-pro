@@ -132,8 +132,8 @@ def check_imports() -> Tuple[bool, List[str]]:
         ("src.core.config", "Core configuration"),
         ("src.models.database", "Database models"),
         ("src.models.schemas", "Pydantic schemas"),
-        ("src.services.pdf_processor", "PDF processor"),
-        ("src.services.llm_manager", "LLM manager"),
+        ("src.services.document.pdf_processor", "PDF processor"),
+        ("src.services.llm.llm_manager", "LLM manager"),
     ]
     
     results = []

@@ -258,10 +258,16 @@ class DockerSetupManager:
             if not await self.initialize_database():
                 raise DockerSetupError("Database initialization failed")
                 
-            # Setup Ollama models (optional - can fail)
-            models_setup = await self.setup_ollama_models()
-            if not models_setup:
-                logger.warning("Ollama models setup failed - application will run with fallback")
+            # Setup Ollama models (only if enabled)
+            auto_download = os.getenv("OLLAMA_AUTO_DOWNLOAD_MODELS", "false").lower() == "true"
+            if auto_download:
+                logger.info("Auto-download enabled, setting up Ollama models")
+                models_setup = await self.setup_ollama_models()
+                if not models_setup:
+                    logger.warning("Ollama models setup failed - application will run with fallback")
+            else:
+                logger.info("Auto-download disabled, skipping Ollama model setup")
+                logger.info("Models can be downloaded later via the Streamlit interface")
                 
             # Final health check
             health_results = await self.health_check()

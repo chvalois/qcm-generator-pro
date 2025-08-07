@@ -32,7 +32,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY src/ ./src/
 COPY scripts/ ./scripts/
+COPY main_app.py ./
 COPY Makefile ./
+COPY .streamlit/ ./.streamlit/
 
 # Create data directories with proper permissions
 RUN mkdir -p data/pdfs data/vectorstore data/database data/exports data/cache logs uploads && \

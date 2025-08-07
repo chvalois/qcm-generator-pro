@@ -51,6 +51,7 @@ services:
       - LLM_MODEL_TYPE=ollama
       - LLM_OLLAMA_BASE_URL=http://ollama:11434
       - LLM_OLLAMA_TIMEOUT=300
+      - OLLAMA_AUTO_DOWNLOAD_MODELS=false
       - LLM_DEFAULT_TEMPERATURE=0.7
       - LLM_DEFAULT_MAX_TOKENS=512
       - LLM_DEFAULT_TOP_P=0.9

@@ -10,12 +10,12 @@ import logging
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 
-from ..models.enums import Difficulty, Language, QuestionType
-from ..models.schemas import GenerationConfig, QuestionCreate
-from .document_manager import get_document_manager
+from src.models.enums import Difficulty, Language, QuestionType
+from src.models.schemas import GenerationConfig, QuestionCreate
+from src.services.document.document_manager import get_document_manager
 from .qcm_generator import QCMGenerator
-from .rag_engine import get_rag_engine
-from .progress_tracker import update_progress, increment_progress
+from src.services.infrastructure.rag_engine import get_rag_engine
+from src.services.infrastructure.progress_tracker import update_progress, increment_progress
 
 logger = logging.getLogger(__name__)
 

@@ -14,9 +14,9 @@ from typing import Any, Dict, List
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
-from ..core.config import settings
-from ..models.enums import ProcessingStatus
-from ..models.schemas import DocumentCreate, ProcessingConfig
+from src.core.config import settings
+from src.models.enums import ProcessingStatus
+from src.models.schemas import DocumentCreate, ProcessingConfig
 
 logger = logging.getLogger(__name__)
 

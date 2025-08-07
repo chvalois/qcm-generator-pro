@@ -109,7 +109,7 @@ def start_streamlit_app(
         cmd = [
             "streamlit",
             "run",
-            "src/ui/streamlit_app.py",
+            "main_app.py",
             "--server.address", host,
             "--server.port", str(port),
             "--server.headless", "true",

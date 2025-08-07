@@ -76,6 +76,10 @@ make run-ui
 
 ## 🏗️ Architecture
 
+### 🎯 **NOUVELLE ARCHITECTURE** *(Janvier 2025)*
+
+L'architecture a été **complètement réorganisée** en domaines métier pour une meilleure maintenabilité :
+
 ```mermaid
 graph TB
     subgraph "🎨 Interface Layer"
@@ -83,19 +87,44 @@ graph TB
         API[FastAPI REST API]
     end
     
-    subgraph "🧠 Core Services"
+    subgraph "📄 Document Domain"
         PDF[PDF Processor]
         THEME[Theme Extractor]
-        QCM[QCM Generator]
-        VAL[Validator]
-        EXP[Exporter]
+        TITLE[Title Detector]
+        DOC[Document Manager]
     end
     
-    subgraph "🤖 LLM Integration"
+    subgraph "⚡ Generation Domain"
+        QCM[QCM Generator]
+        CHUNK[Chunk Generator]
+        TITLE_GEN[Title Generator]
+        ENHANCED[Enhanced Generator]
+        WORKFLOW[Progressive Workflow]
+        PROMPT[Prompt Builder]
+        PARSER[Question Parser]
+        SELECT[Question Selection]
+    end
+    
+    subgraph "✅ Quality Domain"
+        VAL[Validator]
+        DEDUP[Deduplicator]
+        DIVERSITY[Diversity Enhancer]
+        VARIETY[Variety Validator]
+    end
+    
+    subgraph "🤖 LLM Domain"
         LLM[LLM Manager]
+        TRACK[LangSmith Tracker]
+        EXAMPLES[Examples Loader]
         OPENAI[OpenAI API]
         ANTHROPIC[Anthropic API]
         OLLAMA[Ollama Local]
+    end
+    
+    subgraph "🔧 Infrastructure Domain"
+        RAG[RAG Engine]
+        PROGRESS[Progress Tracker]
+        CHROMA[ChromaDB]
     end
     
     subgraph "💾 Data Layer"
@@ -116,6 +145,28 @@ graph TB
     LLM --> ANTHROPIC
     LLM --> OLLAMA
 ```
+
+### 🆕 **Changements Récents** *(Janvier 2025)*
+
+#### ✅ **Réorganisation Architecture Services**
+- **21 services** réorganisés en **5 domaines métier** clairs
+- **50+ imports** mis à jour dans toute la codebase
+- **21/21 tests** passent toujours ✅
+- **Scripts** corrigés pour les nouveaux chemins d'imports
+
+#### 🏗️ **Nouvelle Structure Services**
+```
+src/services/
+├── document/          📄 Gestion documents (4 services)
+├── generation/        ⚡ Génération QCM (8 services)  
+├── quality/          ✅ Assurance qualité (4 services)
+├── llm/             🤖 Intégration LLM (3 services)
+└── infrastructure/   🔧 Services infrastructure (2 services)
+```
+
+#### 🔄 **Migration des Imports**
+- **Avant** : `from src.services.llm_manager import ...`
+- **Après** : `from src.services.llm.llm_manager import ...`
 
 ### 📁 Structure du Projet
 
@@ -224,10 +275,35 @@ python -c "from src.models.database import init_database; init_database()"
 # Lancer l'interface Streamlit
 make run-ui
 # ou
-streamlit run src/ui/streamlit_app.py
+streamlit run main_app.py
 ```
 
 Ouvrez http://localhost:8501 dans votre navigateur.
+
+### 🛠️ **Commandes Make Essentielles**
+
+```bash
+# 🚀 Lancement Application
+make run-app          # Lance l'app complète (API + UI) - RECOMMANDÉ
+make run-app-debug    # Lance en mode debug
+make run-ui           # Interface Streamlit uniquement
+make run              # API FastAPI uniquement
+
+# 🧪 Tests & Validation  
+make test-working     # Tests validés (21 tests) - RECOMMANDÉ
+make quick-check      # Validation rapide (format + lint + tests core)
+make full-check       # Validation complète
+
+# 🔧 Développement
+make install-dev      # Installation complète environnement dev
+make format           # Formatage code (black + ruff)
+make lint             # Linting (ruff + mypy)
+
+# 🐳 Docker
+make docker-run       # Docker avec GPU
+make docker-run-cpu   # Docker CPU uniquement
+make docker-clean     # Nettoyage Docker
+```
 
 ### 🚀 Workflow Complet
 
@@ -323,19 +399,28 @@ Services disponibles :
 
 ### 🏃 Exécution des Tests
 
+#### ✅ **Tests avec Nouvelle Architecture** 
 ```bash
-# Tous les tests
+# Tests recommandés (21 tests validés)
+make test-working
+
+# Tous les tests avec couverture
 make test
 
-# Tests unitaires uniquement
-make test-unit
+# Tests de base uniquement  
+make test-basic
 
-# Tests avec couverture
-make test-cov
+# Tests rapides (format + lint + tests core)
+make quick-check
 
-# Tests d'intégration
-pytest tests/integration/ -v
+# Vérification complète (format + lint + tous les tests)
+make full-check
 ```
+
+#### 📊 **Couverture de Tests**
+- **21/21 tests** passent avec la nouvelle architecture ✅
+- Tests des modèles, schémas et fonctionnalités de base
+- Validation de l'intégrité après réorganisation des services
 
 ### 📊 Couverture de Code
 

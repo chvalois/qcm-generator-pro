@@ -12,19 +12,19 @@ from typing import Any, Callable, Dict, List, Optional
 
 from src.models.enums import Difficulty, Language, QuestionType
 from src.models.schemas import GenerationConfig, QuestionCreate, QuestionContext
-from src.services.llm_manager import get_llm_manager
-from src.services.rag_engine import get_rag_engine
-from src.services.question_prompt_builder import get_question_prompt_builder
-from src.services.question_parser import get_question_parser
-from src.services.question_selection import get_question_selector
-from src.services.progressive_workflow import get_progressive_workflow_manager
-from src.services.progress_tracker import (
+from src.services.llm.llm_manager import get_llm_manager
+from src.services.infrastructure.rag_engine import get_rag_engine
+from src.services.generation.question_prompt_builder import get_question_prompt_builder
+from src.services.generation.question_parser import get_question_parser
+from src.services.generation.question_selection import get_question_selector
+from src.services.generation.progressive_workflow import get_progressive_workflow_manager
+from src.services.infrastructure.progress_tracker import (
     start_progress_session, update_progress, increment_progress, 
     complete_progress_session, fail_progress_session
 )
-from src.services.question_deduplicator import get_question_deduplicator
-from src.services.question_diversity_enhancer import get_diversity_enhancer
-from src.services.langsmith_tracker import get_langsmith_tracker
+from src.services.quality.question_deduplicator import get_question_deduplicator
+from src.services.quality.question_diversity_enhancer import get_diversity_enhancer
+from src.services.llm.langsmith_tracker import get_langsmith_tracker
 
 # LangSmith imports
 try:
@@ -189,9 +189,11 @@ class QCMGenerator:
                 if examples_file:
                     # Add Few-Shot context at the beginning of the prompt
                     try:
-                        from .simple_examples_loader import get_examples_loader
+                        from src.services.llm.simple_examples_loader import get_examples_loader
                         loader = get_examples_loader()
-                        examples = loader.get_examples_for_context(examples_file, max_examples=max_examples or 3)
+                        # Add .json extension if not present
+                        examples_file_with_ext = examples_file if examples_file.endswith('.json') else f"{examples_file}.json"
+                        examples = loader.get_examples_for_context(examples_file_with_ext, max_examples=max_examples or 3)
                         
                         if examples:
                             fewshot_header = f"\n=== FEW-SHOT EXAMPLES (File: {examples_file}, Count: {len(examples)}) ===\n\n"

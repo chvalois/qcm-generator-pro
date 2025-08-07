@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional
 from src.models.enums import Difficulty, Language, QuestionType
 from src.models.schemas import GenerationConfig, QuestionContext
 from src.prompts.templates import generate_question_prompt, get_system_prompt
-from .simple_examples_loader import get_examples_loader
+from src.services.llm.simple_examples_loader import get_examples_loader
 
 logger = logging.getLogger(__name__)
 

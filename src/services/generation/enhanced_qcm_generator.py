@@ -11,10 +11,10 @@ from typing import Any, Dict, List, Optional
 
 from src.models.enums import Difficulty, Language, QuestionType
 from src.models.schemas import GenerationConfig, QuestionCreate
-from src.services.qcm_generator import get_qcm_generator
-from src.services.chunk_based_generator import get_chunk_based_generator
-from src.services.chunk_variety_validator import get_chunk_variety_validator
-from src.services.progress_tracker import (
+from src.services.generation.qcm_generator import get_qcm_generator
+from src.services.generation.chunk_based_generator import get_chunk_based_generator
+from src.services.quality.chunk_variety_validator import get_chunk_variety_validator
+from src.services.infrastructure.progress_tracker import (
     get_progress_tracker, start_progress_session, update_progress, 
     complete_progress_session, fail_progress_session
 )
